@@ -5,11 +5,7 @@ PREREQUISITES
 -------------
 You need Node.js installed once on your PC. You don't need admin rights.
 
-  1. Go to https://nodejs.org
-  2. Download the big green "LTS" button
-  3. Run the installer, click Next until it finishes
-
-That's the only prerequisite. You won't need to touch Node.js again.
+  1. Go to Company Portal --> look for "Node" and install
 
 
 GETTING THE APP
