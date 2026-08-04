@@ -41,7 +41,22 @@ if not errorlevel 1 (
     exit /b 0
 )
 
-rem ---------- 3. First-time setup ----------
+rem ---------- 3. Pull latest updates ----------
+where git >nul 2>&1
+if errorlevel 1 (
+    echo   [--] git not found - skipping update check.
+) else (
+    echo   Checking for updates...
+    git pull
+    if errorlevel 1 (
+        echo   [!] Could not pull updates ^(no internet?^). Continuing with local version.
+    ) else (
+        echo   [OK] Up to date.
+    )
+)
+echo.
+
+rem ---------- 4. First-time setup ----------
 if not exist "node_modules\" goto install
 if not exist "node_modules\next\" goto install
 goto run
@@ -65,7 +80,7 @@ echo.
 rem Start the server in this window's background, then wait for the port.
 start "Personal Asana Dashboard - server" /min cmd /c "npm run dev > dashboard-log.txt 2>&1"
 
-rem ---------- 4. Wait for it to come up (up to ~60s) ----------
+rem ---------- 5. Wait for it to come up (up to ~60s) ----------
 set /a TRIES=0
 :waitloop
 set /a TRIES+=1
