@@ -18,7 +18,7 @@ GETTING THE APP
   2. Navigate to where you want the folder, e.g.:
        cd %USERPROFILE%\Desktop
   3. Run:
-       git clone <repo-url>
+       git clone https://github.com/alonsabban/Asana-Personal-Dashboard.git
   4. This creates a folder called "personal-dashboard" — that's the app folder
 
 
