@@ -22,36 +22,17 @@ GETTING THE APP
   4. This creates a folder called "personal-dashboard" — that's the app folder
 
 
-CONFIGURATION
--------------
-  1. Inside the app folder, create a new text file named exactly:
-       .env.local
-     (note the dot at the start – it must be exactly this name)
-
-  2. Paste the following into it:
-       ASANA_PAT=your_asana_token_here
-
-  3. To get your Asana token:
-       - Go to https://app.asana.com/0/my-profile/apps
-       - Scroll to "Personal access tokens" → click "New access token"
-       - Give it any name, copy the token, paste it into .env.local
-
-Optional – AI subject classification (leave out if not sure, it works without it):
-       AWS_ACCESS_KEY_ID=...
-       AWS_SECRET_ACCESS_KEY=...
-       AWS_REGION=us-east-1
-
-
 RUNNING THE DASHBOARD
 ---------------------
 Double-click START-DASHBOARD.bat. It will guide you from there.
 
+The first time it runs, the dashboard will ask for your Asana token directly in the browser.
 To make it easy to launch every day, right-click START-DASHBOARD.bat → "Send to" → "Desktop (create shortcut)"
 
 
 NOTES
 -----
-- Your Asana token and settings are stored only on your own PC (~/.dashboard_settings.json)
-  Nothing is sent to any server other than Asana's own API.
+- Your Asana token and settings are stored only on your own PC. Nothing is sent to any server
+  other than Asana's own API.
 - If something goes wrong, check dashboard-log.txt in the app folder and send it to
   Alon Sabban (asabban@paloaltonetworks.com).
