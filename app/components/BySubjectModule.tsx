@@ -12,7 +12,10 @@ type GroupBy = "none" | "subject" | "project";
 export default function BySubjectModule() {
   const { data, refresh, query } = useAsana();
   const [showSettings, setShowSettings] = useState(false);
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>(() => {
+    if (typeof window === "undefined") return "project";
+    return (localStorage.getItem("taskGroupBy") as GroupBy) ?? "project";
+  });
 
   /* Invite subject setup once, right after connecting. */
   const [inviteSubjects, setInviteSubjects] = useState(false);
@@ -47,7 +50,11 @@ export default function BySubjectModule() {
                 <button
                   key={g}
                   className={`btn-group-by${groupBy === g ? " active" : ""}`}
-                  onClick={() => setGroupBy((v) => v === g ? "none" : g)}
+                  onClick={() => setGroupBy((v) => {
+                    const next = v === g ? "none" : g;
+                    localStorage.setItem("taskGroupBy", next);
+                    return next;
+                  })}
                 >
                   {g === "subject" ? "By subject" : "By project"}
                 </button>
