@@ -1,0 +1,67 @@
+Personal Asana Dashboard – Installation Instructions
+=====================================================
+
+PREREQUISITES
+-------------
+You need Node.js installed once on your PC. You don't need admin rights.
+
+  1. Go to https://nodejs.org
+  2. Download the big green "LTS" button
+  3. Run the installer, click Next until it finishes
+
+That's the only prerequisite. You won't need to touch Node.js again.
+
+
+GETTING THE APP
+---------------
+  1. Open Command Prompt (press Win+R, type cmd, press Enter)
+  2. Navigate to where you want the folder, e.g.:
+       cd %USERPROFILE%\Desktop
+  3. Run:
+       git clone <repo-url>
+  4. This creates a folder called "personal-dashboard" — that's the app folder
+
+
+CONFIGURATION
+-------------
+  1. Inside the extracted folder, create a new text file named exactly:
+       .env.local
+     (note the dot at the start – it must be exactly this name)
+
+  2. Paste the following into it:
+       ASANA_PAT=your_asana_token_here
+
+  3. To get your Asana token:
+       - Go to https://app.asana.com/0/my-profile/apps
+       - Scroll to "Personal access tokens" → click "New access token"
+       - Give it any name, copy the token, paste it into .env.local
+
+Optional – AI subject classification (leave out if not sure, it works without it):
+       AWS_ACCESS_KEY_ID=...
+       AWS_SECRET_ACCESS_KEY=...
+       AWS_REGION=us-east-1
+
+
+RUNNING THE DASHBOARD
+---------------------
+  1. Double-click START-DASHBOARD.bat
+  2. The first time it runs, it downloads dependencies (takes a few minutes, normal)
+  3. Your browser opens automatically to http://localhost:3000
+  4. Keep the window open while you use the dashboard — closing it stops the app
+
+To make it easy to launch, right-click START-DASHBOARD.bat → "Send to" → "Desktop (create shortcut)"
+
+
+STOPPING
+--------
+Press any key in the dashboard window, or just close it.
+
+
+NOTES
+-----
+- Your Asana token and settings are stored only on your own PC (~/.dashboard_settings.json)
+  Nothing is sent to any server other than Asana's own API.
+- If the dashboard doesn't load, check dashboard-log.txt in the app folder and send it to
+  Alon Sabban (asabban@paloaltonetworks.com).
+- If you're on a corporate network with SSL issues, open the BAT file in Notepad and follow
+  the comment at the top about NODE_OPTIONS.
