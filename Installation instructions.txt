@@ -24,7 +24,7 @@ GETTING THE APP
 
 CONFIGURATION
 -------------
-  1. Inside the extracted folder, create a new text file named exactly:
+  1. Inside the app folder, create a new text file named exactly:
        .env.local
      (note the dot at the start – it must be exactly this name)
 
@@ -44,24 +44,14 @@ Optional – AI subject classification (leave out if not sure, it works without 
 
 RUNNING THE DASHBOARD
 ---------------------
-  1. Double-click START-DASHBOARD.bat
-  2. The first time it runs, it downloads dependencies (takes a few minutes, normal)
-  3. Your browser opens automatically to http://localhost:3000
-  4. Keep the window open while you use the dashboard — closing it stops the app
+Double-click START-DASHBOARD.bat. It will guide you from there.
 
-To make it easy to launch, right-click START-DASHBOARD.bat → "Send to" → "Desktop (create shortcut)"
-
-
-STOPPING
---------
-Press any key in the dashboard window, or just close it.
+To make it easy to launch every day, right-click START-DASHBOARD.bat → "Send to" → "Desktop (create shortcut)"
 
 
 NOTES
 -----
 - Your Asana token and settings are stored only on your own PC (~/.dashboard_settings.json)
   Nothing is sent to any server other than Asana's own API.
-- If the dashboard doesn't load, check dashboard-log.txt in the app folder and send it to
+- If something goes wrong, check dashboard-log.txt in the app folder and send it to
   Alon Sabban (asabban@paloaltonetworks.com).
-- If you're on a corporate network with SSL issues, open the BAT file in Notepad and follow
-  the comment at the top about NODE_OPTIONS.
