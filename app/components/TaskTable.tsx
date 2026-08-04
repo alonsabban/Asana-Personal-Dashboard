@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useRef, useState } from "react";
+import { Fragment, forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import type { AsanaTask } from "@/app/lib/asana";
 import CommentsPanel from "@/app/components/CommentsPanel";
 import MentionTextarea from "@/app/components/MentionTextarea";
@@ -8,6 +8,7 @@ import MentionTextarea from "@/app/components/MentionTextarea";
 type SortKey = "name" | "subject" | "project" | "due" | "assignee" | "created";
 type SortDir = "asc" | "desc";
 type UserHit = { gid: string; name: string; email: string | null };
+type ColKey  = "status" | "subject" | "project" | "assignee";
 
 /* ── helpers ── */
 function fmtDue(due: string) {
@@ -43,6 +44,32 @@ function sortTasks(tasks: AsanaTask[], key: SortKey, dir: SortDir): AsanaTask[] 
   });
 }
 
+const ColFilterDropdown = forwardRef<HTMLDivElement, {
+  col: string;
+  values: string[];
+  active: Set<string>;
+  onToggle: (v: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}>(function ColFilterDropdown({ values, active, onToggle, onClear, onClose }, ref) {
+  return (
+    <div className="col-filter-dropdown" ref={ref}>
+      {values.length === 0
+        ? <div className="col-filter-empty">No values</div>
+        : values.map((v) => (
+          <label key={v} className="col-filter-option">
+            <input type="checkbox" checked={active.has(v)} onChange={() => onToggle(v)} />
+            {v}
+          </label>
+        ))
+      }
+      {active.size > 0 && (
+        <button className="col-filter-clear" onClick={() => { onClear(); onClose(); }}>Clear</button>
+      )}
+    </div>
+  );
+});
+
 export default function TaskTable({
   tasks,
   onChanged,
@@ -57,6 +84,8 @@ export default function TaskTable({
   const [sortKey, setSortKey]   = useState<SortKey>("due");
   const [sortDir, setSortDir]   = useState<SortDir>("asc");
   const [filter, setFilter]     = useState("all");
+  const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(new Map());
+  const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [expandedGid, setExp]   = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
@@ -64,9 +93,22 @@ export default function TaskTable({
   /* due-date inline edit */
   const [editDue, setEditDue]   = useState<{ gid: string; value: string } | null>(null);
 
+  /* close column filter dropdown on outside click */
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!openFilterCol) return;
+    function handler(e: MouseEvent) {
+      if (filterDropdownRef.current && filterDropdownRef.current.contains(e.target as Node)) return;
+      setOpenFilterCol(null);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openFilterCol]);
+
   /* description inline edit */
   const [editDesc, setEditDesc] = useState<{ gid: string; value: string } | null>(null);
   const [savingDesc, setSavingDesc] = useState<string | null>(null);
+  const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set());
 
   /* assignee inline edit */
   const [editAsgn, setEditAsgn] = useState<{ gid: string; query: string; hits: UserHit[] } | null>(null);
@@ -134,10 +176,58 @@ export default function TaskTable({
     if (sortKey !== key) return <span className="sort-icon">⇅</span>;
     return <span className="sort-icon active">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
+  function filterIcon(col: ColKey) {
+    const active = columnFilters.get(col) ?? new Set<string>();
+    return (
+      <span className="col-filter-wrap" onClick={(e) => e.stopPropagation()}>
+        <button
+          className={`col-filter-btn${active.size > 0 ? " active" : ""}`}
+          title={`Filter by ${col}`}
+          onClick={() => setOpenFilterCol((v) => v === col ? null : col)}
+        >▾</button>
+        {openFilterCol === col && (
+          <ColFilterDropdown
+            ref={filterDropdownRef}
+            col={col}
+            values={colValues(col)}
+            active={active}
+            onToggle={(v) => toggleColFilter(col, v)}
+            onClear={() => clearColFilter(col)}
+            onClose={() => setOpenFilterCol(null)}
+          />
+        )}
+      </span>
+    );
+  }
 
-  const subjects  = Array.from(new Set(tasks.map((t) => t.subject))).sort();
-  const projects  = Array.from(new Set(tasks.map((t) => t.project))).sort();
-  const filtered  = filter === "all" ? tasks : tasks.filter((t) => t.subject === filter);
+  const subjects    = Array.from(new Set(tasks.map((t) => t.subject))).sort();
+  const projects    = Array.from(new Set(tasks.map((t) => t.project))).sort();
+
+  /* column filter helpers */
+  function colValues(col: ColKey): string[] {
+    return Array.from(new Set(tasks.map((t) => t[col]).filter(Boolean) as string[])).sort();
+  }
+  function toggleColFilter(col: ColKey, value: string) {
+    setColumnFilters((prev) => {
+      const next = new Map(prev);
+      const set  = new Set(next.get(col) ?? []);
+      set.has(value) ? set.delete(value) : set.add(value);
+      set.size === 0 ? next.delete(col) : next.set(col, set);
+      return next;
+    });
+  }
+  function clearColFilter(col: ColKey) {
+    setColumnFilters((prev) => { const next = new Map(prev); next.delete(col); return next; });
+  }
+  const filtered = tasks
+    .filter((t) => filter === "all" || t.subject === filter)
+    .filter((t) => {
+      for (const [col, vals] of columnFilters) {
+        const v = t[col as ColKey] ?? null;
+        if (!vals.has(v as string)) return false;
+      }
+      return true;
+    });
   const displayed = sortTasks(filtered, sortKey, sortDir);
 
   const groups: { label: string; tasks: AsanaTask[] }[] =
@@ -287,26 +377,31 @@ export default function TaskTable({
 
   return (
     <div className="task-table-wrap">
-      {subjects.length > 1 && (
-        <div className="table-toolbar">
+      <div className="table-toolbar">
+        {subjects.length > 1 && (
           <select className="input table-filter-sel" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All subjects ({tasks.length})</option>
             {subjects.map((s) => (
               <option key={s} value={s}>{s} ({tasks.filter((t) => t.subject === s).length})</option>
             ))}
           </select>
-          <span className="table-count">{displayed.length} task{displayed.length !== 1 ? "s" : ""}</span>
-        </div>
-      )}
+        )}
+        {columnFilters.size > 0 && (
+          <button className="btn ghost col-filter-clear-all" onClick={() => setColumnFilters(new Map())}>
+            Clear filters ×
+          </button>
+        )}
+        <span className="table-count">{displayed.length} task{displayed.length !== 1 ? "s" : ""}</span>
+      </div>
 
       <table className="task-table">
         <thead>
           <tr>
             <th className="th-check" />
             <th className="th-name th-sortable"    onClick={() => toggleSort("name")}>Task {sortIcon("name")}</th>
-            <th className="th-subj th-sortable"    onClick={() => toggleSort("subject")}>Subject {sortIcon("subject")}</th>
-            <th className="th-status">Status</th>
-            <th className="th-proj th-sortable"    onClick={() => toggleSort("project")}>Project {sortIcon("project")}</th>
+            <th className="th-subj th-sortable"    onClick={() => toggleSort("subject")}>Subject {sortIcon("subject")}{filterIcon("subject")}</th>
+            <th className="th-status">Status{filterIcon("status")}</th>
+            <th className="th-proj th-sortable"    onClick={() => toggleSort("project")}>Project {sortIcon("project")}{filterIcon("project")}</th>
             <th className="th-section">Group</th>
             <th className="th-due  th-sortable"    onClick={() => toggleSort("due")}>Due {sortIcon("due")}</th>
             <th className="th-created th-sortable" onClick={() => toggleSort("created")}>Created {sortIcon("created")}</th>
@@ -531,9 +626,23 @@ export default function TaskTable({
                       </div>
                     ) : (
                       <span className={`desc-preview${savingDesc === task.gid ? " saving" : ""}`}>
-                        {task.notes
-                          ? task.notes
-                          : <span className="no-val">—</span>}
+                        {task.notes ? (() => {
+                          const words = task.notes.split(/\s+/);
+                          const isExpanded = expandedDesc.has(task.gid);
+                          const needsTrunc = words.length > 20;
+                          const shown = isExpanded ? task.notes : words.slice(0, 20).join(" ");
+                          return <>
+                            {shown}{needsTrunc && !isExpanded && "…"}
+                            {needsTrunc && (
+                              <span
+                                className="desc-expand-toggle"
+                                onClick={(e) => { e.stopPropagation(); setExpandedDesc((s) => { const n = new Set(s); isExpanded ? n.delete(task.gid) : n.add(task.gid); return n; }); }}
+                              >
+                                {isExpanded ? "show less" : "expand to show more"}
+                              </span>
+                            )}
+                          </>;
+                        })() : <span className="no-val">—</span>}
                       </span>
                     )}
                   </td>

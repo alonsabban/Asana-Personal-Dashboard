@@ -19,6 +19,7 @@ export default function CommentsPanel({ gid }: { gid: string }) {
   const [loadingS, setLoadingS]     = useState(true);
   const [newSub, setNewSub]         = useState("");
   const [addingSub, setAddingSub]   = useState(false);
+  const [editSub, setEditSub]       = useState<{ gid: string; value: string } | null>(null);
 
   /* ── loaders ── */
   const loadComments = useCallback(async () => {
@@ -85,6 +86,20 @@ export default function CommentsPanel({ gid }: { gid: string }) {
     }
   }
 
+  async function renameSubtask(subGid: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setEditSub(null);
+    try {
+      await fetch(`/api/asana/task/${subGid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      setSubtasks((prev) => prev.map((s) => s.gid === subGid ? { ...s, name: trimmed } : s));
+    } catch { /* ignore */ }
+  }
+
   async function toggleSubtask(subGid: string, completed: boolean) {
     try {
       await fetch("/api/asana/complete", {
@@ -119,7 +134,23 @@ export default function CommentsPanel({ gid }: { gid: string }) {
                 >
                   {s.completed ? "✓" : ""}
                 </button>
-                <span className="subtask-name">{s.name}</span>
+                {editSub?.gid === s.gid ? (
+                  <input
+                    className="input subtask-name-input"
+                    autoFocus
+                    value={editSub.value}
+                    onChange={(e) => setEditSub({ gid: s.gid, value: e.target.value })}
+                    onBlur={() => renameSubtask(s.gid, editSub.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") renameSubtask(s.gid, editSub.value);
+                      if (e.key === "Escape") setEditSub(null);
+                    }}
+                  />
+                ) : (
+                  <span className="subtask-name" onClick={() => setEditSub({ gid: s.gid, value: s.name })}>
+                    {s.name}
+                  </span>
+                )}
                 {s.due && <span className="pill subtask-due">{s.due}</span>}
               </div>
             ))}
