@@ -319,7 +319,7 @@ export async function getAsanaData(): Promise<AsanaData> {
   if (!workspace) throw new Error("No Asana workspace found for this user.");
 
   const fields =
-    "name,notes,completed,due_on,created_at,permalink_url,projects.gid,projects.name,memberships.project.gid,memberships.section.gid,memberships.section.name,created_by.name,assignee.name,custom_fields.gid,custom_fields.name,custom_fields.type,custom_fields.enum_value.name,custom_fields.enum_options.gid,custom_fields.enum_options.name";
+    "name,notes,completed,due_on,created_at,permalink_url,parent.gid,projects.gid,projects.name,memberships.project.gid,memberships.section.gid,memberships.section.name,created_by.name,assignee.name,custom_fields.gid,custom_fields.name,custom_fields.type,custom_fields.enum_value.name,custom_fields.enum_options.gid,custom_fields.enum_options.name";
 
   // `completed_since=now` is Asana's idiom for "incomplete only" — it drops closed
   // tasks server-side instead of paying to download and then discard them. Every
@@ -333,8 +333,8 @@ export async function getAsanaData(): Promise<AsanaData> {
   // 7-day window with a single field so the extra pages cost almost nothing.
   const completedCount = await countRecentlyCompleted(workspace.gid, token);
 
-  // Phase 1: normalize without classification
-  const rawTasks = tasks.map((t) => {
+  // Phase 1: normalize without classification — exclude subtasks (tasks with a parent)
+  const rawTasks = tasks.filter((t) => !t.parent?.gid).map((t) => {
     const projectGid = t.projects?.[0]?.gid ?? null;
     const membership = projectGid
       ? t.memberships?.find((m) => m.project.gid === projectGid)
