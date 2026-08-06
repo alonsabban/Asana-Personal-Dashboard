@@ -83,12 +83,30 @@ export default function TaskTable({
 }) {
   const [sortKey, setSortKey]   = useState<SortKey>("due");
   const [sortDir, setSortDir]   = useState<SortDir>("asc");
-  const [filter, setFilter]     = useState("all");
-  const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(new Map());
+  const [filter, setFilter]     = useState<string>(() => {
+    try { return localStorage.getItem("taskFilter") ?? "all"; } catch { return "all"; }
+  });
+  const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(() => {
+    try {
+      const raw = localStorage.getItem("taskColumnFilters");
+      if (!raw) return new Map();
+      const obj = JSON.parse(raw) as Record<string, string[]>;
+      return new Map(Object.entries(obj).map(([k, v]) => [k, new Set(v)]));
+    } catch { return new Map(); }
+  });
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [expandedGid, setExp]   = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
+
+  /* persist filter state */
+  useEffect(() => { try { localStorage.setItem("taskFilter", filter); } catch {} }, [filter]);
+  useEffect(() => {
+    try {
+      const obj = Object.fromEntries([...columnFilters.entries()].map(([k, v]) => [k, [...v]]));
+      localStorage.setItem("taskColumnFilters", JSON.stringify(obj));
+    } catch {}
+  }, [columnFilters]);
 
   /* due-date inline edit */
   const [editDue, setEditDue]   = useState<{ gid: string; value: string } | null>(null);
