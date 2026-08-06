@@ -75,8 +75,11 @@ export default function AddTaskModal({
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
-      await onAdded();
       onClose();
+      // Asana's API is eventually consistent — wait briefly before refreshing
+      // so the new task is available in the list endpoint.
+      await new Promise((r) => setTimeout(r, 1500));
+      await onAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
