@@ -59,7 +59,7 @@ const ColFilterDropdown = forwardRef<HTMLDivElement, {
         : values.map((v) => (
           <label key={v} className="col-filter-option">
             <input type="checkbox" checked={active.has(v)} onChange={() => onToggle(v)} />
-            {v}
+            {v === "(blank)" ? <em>{v}</em> : v}
           </label>
         ))
       }
@@ -222,8 +222,11 @@ export default function TaskTable({
   const projects    = Array.from(new Set(tasks.map((t) => t.project))).sort();
 
   /* column filter helpers */
+  const BLANK = "(blank)";
   function colValues(col: ColKey): string[] {
-    return Array.from(new Set(tasks.map((t) => t[col]).filter(Boolean) as string[])).sort();
+    const vals = Array.from(new Set(tasks.map((t) => t[col]).filter(Boolean) as string[])).sort();
+    if (tasks.some((t) => !t[col])) vals.push(BLANK);
+    return vals;
   }
   function toggleColFilter(col: ColKey, value: string) {
     setColumnFilters((prev) => {
@@ -242,7 +245,8 @@ export default function TaskTable({
     .filter((t) => {
       for (const [col, vals] of columnFilters) {
         const v = t[col as ColKey] ?? null;
-        if (!vals.has(v as string)) return false;
+        const matches = v ? vals.has(v as string) : vals.has(BLANK);
+        if (!matches) return false;
       }
       return true;
     });
