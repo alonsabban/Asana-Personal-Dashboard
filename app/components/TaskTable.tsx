@@ -549,17 +549,8 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       <span
                         className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
                         onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                        title={task.subtaskInProgress ? "A subtask is In Progress" : undefined}
                       >
-                        {task.status}{task.subtaskInProgress ? " ↳" : ""}
-                      </span>
-                    ) : task.subtaskInProgress ? (
-                      <span
-                        className={`pill status status-in-progress${task.statusFieldGid ? " subj-clickable" : ""}`}
-                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                        title="Derived from a subtask"
-                      >
-                        In Progress
+                        {task.status}
                       </span>
                     ) : (
                       <span
