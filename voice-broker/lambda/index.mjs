@@ -1,12 +1,6 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  QueryCommand,
-  BatchWriteCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient, PutItemCommand, QueryCommand, BatchWriteItemCommand } from "@aws-sdk/client-dynamodb";
 
-const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const client = new DynamoDBClient({});
 const TABLE = process.env.TABLE_NAME;
 
 const CORS = {
@@ -28,14 +22,10 @@ export async function handler(event) {
 
   if (method === "OPTIONS") return ok({});
 
-  // ── POST /tasks — mobile page submits a voice task ────────────────────────
+  // ── POST /tasks ───────────────────────────────────────────────────────────
   if (method === "POST") {
     let body;
-    try {
-      body = JSON.parse(event.body ?? "{}");
-    } catch {
-      return err("Invalid JSON");
-    }
+    try { body = JSON.parse(event.body ?? "{}"); } catch { return err("Invalid JSON"); }
 
     const { userToken, name, due } = body;
     if (!userToken?.trim()) return err("userToken is required");
@@ -43,25 +33,24 @@ export async function handler(event) {
 
     const taskId = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
-    const sevenDays = 7 * 24 * 60 * 60;
 
-    await client.send(new PutCommand({
+    await client.send(new PutItemCommand({
       TableName: TABLE,
       Item: {
-        userToken: userToken.trim(),
-        taskId,
-        name: name.trim(),
-        ...(due ? { due } : {}),
-        createdAt: new Date().toISOString(),
-        consumed: false,
-        expiresAt: now + sevenDays,
+        userToken: { S: userToken.trim() },
+        taskId:    { S: taskId },
+        name:      { S: name.trim() },
+        ...(due ? { due: { S: due } } : {}),
+        createdAt: { S: new Date().toISOString() },
+        consumed:  { BOOL: false },
+        expiresAt: { N: String(now + 7 * 24 * 60 * 60) },
       },
     }));
 
     return ok({ ok: true, taskId });
   }
 
-  // ── GET /tasks?token=xxx — dashboard polls for pending tasks ──────────────
+  // ── GET /tasks?token=xxx ──────────────────────────────────────────────────
   if (method === "GET") {
     const userToken = event.queryStringParameters?.token;
     if (!userToken?.trim()) return err("token query parameter is required");
@@ -70,21 +59,23 @@ export async function handler(event) {
       TableName: TABLE,
       KeyConditionExpression: "userToken = :t",
       FilterExpression: "consumed = :f",
-      ExpressionAttributeValues: { ":t": userToken.trim(), ":f": false },
+      ExpressionAttributeValues: {
+        ":t": { S: userToken.trim() },
+        ":f": { BOOL: false },
+      },
     }));
 
-    const tasks = result.Items ?? [];
+    const items = result.Items ?? [];
 
-    // Mark all returned tasks as consumed in one batch
-    if (tasks.length > 0) {
-      // BatchWrite accepts max 25 items per call; chunk if needed
-      for (let i = 0; i < tasks.length; i += 25) {
-        const chunk = tasks.slice(i, i + 25);
-        await client.send(new BatchWriteCommand({
+    // Mark all as consumed
+    if (items.length > 0) {
+      for (let i = 0; i < items.length; i += 25) {
+        const chunk = items.slice(i, i + 25);
+        await client.send(new BatchWriteItemCommand({
           RequestItems: {
-            [TABLE]: chunk.map((t) => ({
+            [TABLE]: chunk.map((item) => ({
               PutRequest: {
-                Item: { ...t, consumed: true },
+                Item: { ...item, consumed: { BOOL: true } },
               },
             })),
           },
@@ -93,11 +84,11 @@ export async function handler(event) {
     }
 
     return ok({
-      tasks: tasks.map(({ taskId, name, due, createdAt }) => ({
-        taskId,
-        name,
-        ...(due ? { due } : {}),
-        createdAt,
+      tasks: items.map((item) => ({
+        taskId:    item.taskId.S,
+        name:      item.name.S,
+        ...(item.due ? { due: item.due.S } : {}),
+        createdAt: item.createdAt.S,
       })),
     });
   }
