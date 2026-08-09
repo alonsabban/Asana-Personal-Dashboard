@@ -99,6 +99,34 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
           {error && <div className="banner" style={{ marginBottom: 12 }}>{error}</div>}
           {saved && <div className="banner" style={{ marginBottom: 12, borderColor: "var(--success)", color: "var(--success)" }}>Saved ✓</div>}
 
+          <div style={{
+            background: voicePageUrl ? "rgba(0,196,255,0.06)" : "rgba(255,255,255,0.02)",
+            border: `1px solid ${voicePageUrl ? "var(--accent)" : "var(--border)"}`,
+            borderRadius: 10,
+            padding: "14px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: voicePageUrl ? "var(--accent)" : "var(--text-faint)", margin: 0 }}>
+              📱 Your mobile voice page link
+            </p>
+            {voicePageUrl ? (
+              <>
+                <p style={{ fontSize: 13, wordBreak: "break-all", color: "var(--text)", margin: 0, lineHeight: 1.6 }}>
+                  {voicePageUrl}
+                </p>
+                <button className="btn" style={{ alignSelf: "flex-start", fontSize: 13 }} onClick={copyLink}>
+                  {copied ? "Copied ✓" : "Copy link"}
+                </button>
+              </>
+            ) : (
+              <p style={{ fontSize: 12, color: "var(--text-faint)", margin: 0 }}>
+                Fill in the Mobile page URL below and save to generate your link.
+              </p>
+            )}
+          </div>
+
           <div className="field">
             <label className="field-label">Broker API URL</label>
             <input
@@ -143,34 +171,6 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
             </p>
           </div>
 
-          {voicePageUrl && (
-            <div style={{
-              background: "rgba(0,196,255,0.06)",
-              border: "1px solid var(--accent)",
-              borderRadius: 10,
-              padding: "14px 16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}>
-              <p style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700, margin: 0 }}>
-                📱 Your mobile voice page
-              </p>
-              <p style={{ fontSize: 12, wordBreak: "break-all", color: "var(--text)", margin: 0, lineHeight: 1.6 }}>
-                {voicePageUrl}
-              </p>
-              <button
-                className="btn"
-                style={{ alignSelf: "flex-start", fontSize: 13 }}
-                onClick={copyLink}
-              >
-                {copied ? "Copied ✓" : "Copy link"}
-              </button>
-              <p style={{ fontSize: 11, color: "var(--text-faint)", margin: 0 }}>
-                Send this to your phone and bookmark it — use it to add tasks by voice from anywhere.
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="modal-foot">
