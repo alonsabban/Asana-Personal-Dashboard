@@ -345,6 +345,23 @@ export async function getAsanaData(): Promise<AsanaData> {
     }
   }
 
+  // Auto-promote: for any parent task that has no status but has an in-progress subtask,
+  // silently write "In Progress" to Asana so it persists. Fire-and-forget in parallel.
+  const autoPromotePromises: Promise<void>[] = [];
+  for (const t of tasks) {
+    if (t.parent?.gid || t.completed) continue;
+    if (!subtaskInProgressParents.has(t.gid)) continue;
+    const statusField = t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status");
+    if (statusField?.enum_value?.name) continue; // already has a status — don't overwrite
+    if (!statusField?.gid) continue; // no status field on this task — skip
+    const inProgressOption = statusField.enum_options?.find((o) => o.name.toLowerCase().includes("in progress"));
+    if (!inProgressOption) continue; // no matching option — skip
+    autoPromotePromises.push(
+      updateTaskFields(t.gid, { customFields: { [statusField.gid]: inProgressOption.gid } }).catch(() => {/* ignore individual failures */}),
+    );
+  }
+  if (autoPromotePromises.length > 0) await Promise.all(autoPromotePromises);
+
   // Phase 1: normalize without classification — exclude subtasks (tasks with a parent)
   const rawTasks = tasks.filter((t) => !t.parent?.gid).map((t) => {
     const projectGid = t.projects?.[0]?.gid ?? null;
@@ -362,7 +379,16 @@ export async function getAsanaData(): Promise<AsanaData> {
       createdBy: t.created_by?.name ?? null,
       assignee: t.assignee?.name ?? null,
       notes: t.notes ?? "",
-      status: t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status")?.enum_value?.name ?? null,
+      status: (() => {
+        const sf = t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status");
+        if (sf?.enum_value?.name) return sf.enum_value.name;
+        // If this task was just auto-promoted, reflect it immediately in the UI
+        if (subtaskInProgressParents.has(t.gid) && sf) {
+          const opt = sf.enum_options?.find((o) => o.name.toLowerCase().includes("in progress"));
+          if (opt) return opt.name;
+        }
+        return null;
+      })(),
       statusFieldGid: t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status")?.gid ?? null,
       statusOptions: t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status")?.enum_options ?? [],
       createdAt: t.created_at ?? null,
