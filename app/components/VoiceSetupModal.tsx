@@ -154,7 +154,7 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
               <input
                 className="input"
                 value={userToken}
-                readOnly
+                onChange={(e) => setUserToken(e.target.value)}
                 style={{ flex: 1, fontFamily: "monospace", fontSize: 12, color: "var(--text-faint)" }}
               />
               <button
