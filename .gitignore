@@ -41,6 +41,7 @@ yarn-error.log*
 /.claude/
 /AGENTS.md
 /CLAUDE.md
+/AGENTS.md
 
 # screenshots used for docs/experiments, not needed at runtime
 /feed.png
@@ -56,3 +57,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SAM build artifacts (voice-broker)
+/voice-broker/.aws-sam/
+/voice-broker/.samrc

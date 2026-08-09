@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Add Asana Task</title>
+<style>
+  :root {
+    --bg: #050d1a; --surface: #0d1f38; --border: #1a3a5c;
+    --accent: #00c4ff; --text: #e2eaf6; --muted: #6b8ab0;
+    --green: #10b981; --red: #ef4444; --orange: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, system-ui, sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column;
+    padding: 0 0 env(safe-area-inset-bottom);
+  }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 18px 20px 14px; display: flex; align-items: center; gap: 12px;
+  }
+  header h1 { font-size: 17px; font-weight: 700; color: var(--accent); }
+  header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  main { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; max-width: 480px; width: 100%; margin: 0 auto; }
+
+  /* ── Mic button ── */
+  .mic-wrap { display: flex; justify-content: center; margin: 8px 0; }
+  .mic-btn {
+    width: 88px; height: 88px; border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--muted); font-size: 36px;
+    display: grid; place-items: center;
+    cursor: pointer; transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mic-btn.listening {
+    border-color: var(--red); color: var(--red);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .mic-btn.done { border-color: var(--green); color: var(--green); }
+  .mic-btn:disabled { opacity: 0.4; cursor: default; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50%      { box-shadow: 0 0 0 14px rgba(239,68,68,0); }
+  }
+  .mic-hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: -8px; }
+
+  /* ── Form fields ── */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .input {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    padding: 12px 14px; font-size: 16px;
+    font-family: inherit; width: 100%;
+    transition: border-color 0.15s;
+  }
+  .input:focus { outline: none; border-color: var(--accent); }
+  input[type="date"].input { color-scheme: dark; }
+
+  /* ── Submit button ── */
+  .submit-btn {
+    background: var(--accent); color: #050d1a;
+    border: none; border-radius: 12px;
+    padding: 16px; font-size: 16px; font-weight: 700;
+    cursor: pointer; width: 100%; transition: opacity 0.15s;
+    margin-top: 4px;
+  }
+  .submit-btn:disabled { opacity: 0.4; cursor: default; }
+  .submit-btn:active:not(:disabled) { opacity: 0.8; }
+
+  /* ── Status banner ── */
+  .banner {
+    border-radius: 10px; padding: 12px 16px;
+    font-size: 14px; font-weight: 600; text-align: center;
+  }
+  .banner.success { background: rgba(16,185,129,0.12); border: 1px solid var(--green); color: var(--green); }
+  .banner.error   { background: rgba(239,68,68,0.10);  border: 1px solid var(--red);   color: var(--red); }
+  .banner.hidden  { display: none; }
+
+  /* ── Recent tasks ── */
+  .recent-head { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 8px; }
+  .recent-list { display: flex; flex-direction: column; gap: 8px; }
+  .recent-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 14px;
+  }
+  .recent-item .ri-name { color: var(--text); }
+  .recent-item .ri-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── No-token state ── */
+  .no-token {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; text-align: center; padding: 40px 20px;
+  }
+  .no-token .icon { font-size: 48px; }
+  .no-token h2 { font-size: 18px; color: var(--text); }
+  .no-token p  { font-size: 14px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Add Asana Task</h1>
+    <p id="header-sub">Voice or type — syncs to your dashboard</p>
+  </div>
+</header>
+
+<div id="no-token-view" class="no-token" style="display:none">
+  <div class="icon">🔗</div>
+  <h2>No token found</h2>
+  <p>Open this link from your Asana Dashboard's<br><strong>Voice Setup</strong> screen to get your personal link.</p>
+</div>
+
+<main id="main-view">
+  <div class="mic-wrap">
+    <button id="mic-btn" class="mic-btn" aria-label="Tap to dictate" title="Tap to record">🎤</button>
+  </div>
+  <p class="mic-hint" id="mic-hint">Tap to record your task</p>
+
+  <div class="field">
+    <label for="task-name">Task name</label>
+    <input id="task-name" class="input" type="text" placeholder="What needs to be done?" autocomplete="off"/>
+  </div>
+
+  <div class="field">
+    <label for="due-date">Due date (optional)</label>
+    <input id="due-date" class="input" type="date"/>
+  </div>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <button id="submit-btn" class="submit-btn">Add to Asana</button>
+
+  <div id="recent-section" style="display:none">
+    <p class="recent-head">Recently sent</p>
+    <div id="recent-list" class="recent-list"></div>
+  </div>
+</main>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+// The API URL is baked in at deploy time by the deploy script.
+// It can also be overridden by the ?api= query parameter for testing.
+const API_URL_DEFAULT = "__API_URL__";  // replaced by deploy.sh
+
+const params = new URLSearchParams(location.search);
+
+// Token: prefer URL param, fall back to localStorage
+let userToken = params.get("token") || localStorage.getItem("voiceTaskToken") || "";
+if (params.get("token")) localStorage.setItem("voiceTaskToken", params.get("token"));
+
+// API URL: prefer URL param (for testing), then baked-in default
+const apiUrl = (params.get("api") || API_URL_DEFAULT).replace(/\/$/, "");
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const micBtn    = document.getElementById("mic-btn");
+const micHint   = document.getElementById("mic-hint");
+const nameInput = document.getElementById("task-name");
+const dueInput  = document.getElementById("due-date");
+const submitBtn = document.getElementById("submit-btn");
+const banner    = document.getElementById("banner");
+const noToken   = document.getElementById("no-token-view");
+const mainView  = document.getElementById("main-view");
+
+// ── Show/hide based on token ──────────────────────────────────────────────
+if (!userToken) {
+  noToken.style.display = "flex";
+  mainView.style.display = "none";
+}
+
+// ── Date parsing ──────────────────────────────────────────────────────────
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function nextWeekday(name, atLeastTomorrow) {
+  const DAYS = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const target = DAYS.indexOf(name.toLowerCase());
+  const today = new Date();
+  let diff = target - today.getDay();
+  if (diff <= (atLeastTomorrow ? 0 : -1)) diff += 7;
+  const d = new Date(today);
+  d.setDate(today.getDate() + diff);
+  return d;
+}
+
+function parseDateFromTranscript(raw) {
+  const today = new Date();
+  const MONTHS = ["january","february","march","april","may","june",
+                  "july","august","september","october","november","december"];
+  const WD = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+
+  const rules = [
+    [/\btoday\b/i, () => today],
+    [/\btomorrow\b/i, () => { const d = new Date(today); d.setDate(d.getDate()+1); return d; }],
+    [new RegExp(`\\bnext\\s+(${WD})\\b`, "i"), (m) => nextWeekday(m[1], true)],
+    [new RegExp(`\\bon\\s+(${WD})\\b`, "i"), (m) => nextWeekday(m[1], false)],
+    [new RegExp(`\\b(${WD})\\b`, "i"), (m) => nextWeekday(m[1], false)],
+    [/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})\b/i,
+      (m) => {
+        const month = MONTHS.indexOf(m[1].toLowerCase());
+        const d = new Date(today.getFullYear(), month, parseInt(m[2]));
+        if (d < today) d.setFullYear(d.getFullYear() + 1);
+        return d;
+      }
+    ],
+  ];
+
+  for (const [regex, compute] of rules) {
+    const match = raw.match(regex);
+    if (!match) continue;
+    const date = compute(match);
+    if (!date) continue;
+    let taskName = raw.replace(match[0], " ").replace(/\s{2,}/g, " ").trim();
+    taskName = taskName.replace(/\s*(by|on|for|due)\s*$/i, "").trim();
+    taskName = taskName.replace(/^\s*(by|on|for|due)\s*/i, "").trim();
+    return { taskName: taskName || raw.trim(), due: toISODate(date) };
+  }
+  return { taskName: raw.trim(), due: "" };
+}
+
+// ── Voice recording ───────────────────────────────────────────────────────
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+
+if (!SR) {
+  micBtn.disabled = true;
+  micBtn.title = "Voice not supported on this browser";
+  micHint.textContent = "Type your task above";
+}
+
+micBtn.addEventListener("click", () => {
+  if (!SR) return;
+  if (rec) { rec.abort(); rec = null; setMicState("idle"); return; }
+
+  rec = new SR();
+  rec.lang = "en-US";
+  rec.continuous = false;
+  rec.interimResults = false;
+
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    const { taskName, due } = parseDateFromTranscript(transcript);
+    nameInput.value = taskName;
+    if (due) dueInput.value = due;
+    setMicState("done");
+    rec = null;
+  };
+  rec.onerror = () => { setMicState("idle"); rec = null; };
+  rec.onend = () => {
+    if (rec) { rec = null; setMicState("idle"); }
+  };
+
+  rec.start();
+  setMicState("listening");
+});
+
+function setMicState(state) {
+  micBtn.className = "mic-btn" + (state === "listening" ? " listening" : state === "done" ? " done" : "");
+  micBtn.textContent = state === "listening" ? "⏹" : "🎤";
+  micHint.textContent = state === "listening" ? "Listening… tap to stop"
+                      : state === "done"      ? "Got it — edit if needed, then send"
+                      : "Tap to record your task";
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────
+submitBtn.addEventListener("click", async () => {
+  const name = nameInput.value.trim();
+  if (!name) { showBanner("Please enter a task name.", "error"); return; }
+
+  submitBtn.disabled = true;
+  hideBanner();
+
+  try {
+    const body = { userToken, name };
+    if (dueInput.value) body.due = dueInput.value;
+
+    const res = await fetch(`${apiUrl}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Server error");
+
+    showBanner("Sent ✓ — will appear in your dashboard on next load", "success");
+    saveRecent(name, dueInput.value);
+    nameInput.value = "";
+    dueInput.value = "";
+    setMicState("idle");
+  } catch (e) {
+    showBanner("Failed to send: " + e.message, "error");
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// ── Banner ────────────────────────────────────────────────────────────────
+function showBanner(msg, type) {
+  banner.textContent = msg;
+  banner.className = "banner " + type;
+}
+function hideBanner() { banner.className = "banner hidden"; }
+
+// ── Recent tasks (localStorage) ───────────────────────────────────────────
+const RECENT_KEY = "voiceTaskRecent";
+
+function saveRecent(name, due) {
+  const items = getRecent();
+  items.unshift({ name, due, sentAt: new Date().toISOString() });
+  localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, 5)));
+  renderRecent();
+}
+
+function getRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
+}
+
+function renderRecent() {
+  const items = getRecent();
+  const section = document.getElementById("recent-section");
+  const list = document.getElementById("recent-list");
+  if (!items.length) { section.style.display = "none"; return; }
+  section.style.display = "block";
+  list.innerHTML = items.map(({ name, due, sentAt }) => {
+    const d = due ? ` · Due ${due}` : "";
+    const t = new Date(sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `<div class="recent-item"><div class="ri-name">${esc(name)}</div><div class="ri-meta">Sent ${t}${esc(d)}</div></div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+renderRecent();
+</script>
+</body>
+</html>

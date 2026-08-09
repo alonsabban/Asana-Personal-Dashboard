@@ -56,6 +56,7 @@ export async function GET() {
         fromEnv:
           !aws.accessKeyId?.trim() && !!process.env.AWS_ACCESS_KEY_ID?.trim(),
       },
+      voiceBroker: settings.voiceBroker ?? null,
     });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
@@ -80,6 +81,11 @@ export async function POST(req: Request) {
         secretAccessKey?: string;
         region?: string;
         modelId?: string;
+      };
+      voiceBroker?: {
+        apiUrl?: string;
+        userToken?: string;
+        mobileUrl?: string;
       };
     };
 
@@ -134,6 +140,17 @@ export async function POST(req: Request) {
       patch.aws = { region, modelId };
       if (accessKeyId) patch.aws.accessKeyId = accessKeyId;
       if (secretAccessKey) patch.aws.secretAccessKey = secretAccessKey;
+    }
+
+    if (body.voiceBroker) {
+      const vb = body.voiceBroker;
+      if (vb.apiUrl?.trim() && vb.userToken?.trim()) {
+        patch.voiceBroker = {
+          apiUrl: vb.apiUrl.trim(),
+          userToken: vb.userToken.trim(),
+          ...(vb.mobileUrl?.trim() ? { mobileUrl: vb.mobileUrl.trim() } : {}),
+        };
+      }
     }
 
     if (Object.keys(patch).length > 0) await saveSettings(patch);

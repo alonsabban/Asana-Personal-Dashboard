@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Asana Personal Dashboard — Voice Task Broker
+  Receives voice tasks from the mobile page and delivers them to the dashboard.
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 10
+    MemorySize: 128
+
+Parameters:
+  MobilePageUrl:
+    Type: String
+    Default: ""
+    Description: >
+      CloudFront URL of the mobile voice page (used to embed in dashboard settings).
+      Leave blank on first deploy; update after CloudFront distribution is created.
+
+Resources:
+
+  # ── DynamoDB ──────────────────────────────────────────────────────────────
+  VoiceTasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-VoiceTasks"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userToken
+          AttributeType: S
+        - AttributeName: taskId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userToken
+          KeyType: HASH
+        - AttributeName: taskId
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  # ── Lambda ────────────────────────────────────────────────────────────────
+  VoiceTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-handler"
+      CodeUri: lambda/
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref VoiceTasksTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref VoiceTasksTable
+      Events:
+        PostTask:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref VoiceTasksApi
+            Path: /tasks
+            Method: POST
+        GetTasks:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref VoiceTasksApi
+            Path: /tasks
+            Method: GET
+        OptionsTask:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref VoiceTasksApi
+            Path: /tasks
+            Method: OPTIONS
+
+  # ── API Gateway (HTTP API v2) ─────────────────────────────────────────────
+  VoiceTasksApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Sub "${AWS::StackName}-api"
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+
+  # ── S3 bucket for mobile page ─────────────────────────────────────────────
+  MobileBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-mobile-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  MobileBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MobileBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${MobileBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${MobileDistribution}"
+
+  # ── CloudFront OAC ────────────────────────────────────────────────────────
+  MobileOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # ── CloudFront distribution ───────────────────────────────────────────────
+  MobileDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt MobileBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt MobileOAC.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized managed policy
+          AllowedMethods:
+            - GET
+            - HEAD
+        PriceClass: PriceClass_100
+
+Outputs:
+  ApiUrl:
+    Description: Voice tasks broker API URL
+    Value: !Sub "https://${VoiceTasksApi}.execute-api.${AWS::Region}.amazonaws.com"
+  MobileBucketName:
+    Description: S3 bucket name for the mobile page
+    Value: !Ref MobileBucket
+  MobileUrl:
+    Description: CloudFront URL for the mobile voice page
+    Value: !Sub "https://${MobileDistribution.DomainName}"
+  StackName:
+    Description: Stack name
+    Value: !Ref AWS::StackName

@@ -48,6 +48,10 @@ export function AsanaProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      // Pull any pending voice tasks from the broker and create them in Asana
+      // before fetching the task list, so they show up in this refresh.
+      await fetch("/api/voice-poll", { cache: "no-store" }).catch(() => {});
+
       const res = await fetch("/api/asana/tasks", { cache: "no-store" });
       const json = await res.json();
 

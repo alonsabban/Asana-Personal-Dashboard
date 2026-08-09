@@ -35,6 +35,15 @@ export type DashboardSettings = {
   role?: string;
   /** Optional AWS Bedrock credentials for AI classification. */
   aws?: AwsSettings;
+  /** Voice task broker — enables adding tasks by voice from any device. */
+  voiceBroker?: {
+    /** API Gateway URL from the voice-broker SAM deployment. */
+    apiUrl: string;
+    /** Per-user UUID token — identifies this user's task queue in DynamoDB. */
+    userToken: string;
+    /** CloudFront URL of the mobile voice page (without token). */
+    mobileUrl?: string;
+  };
 };
 
 const SETTINGS_PATH = join(homedir(), ".dashboard_settings.json");
