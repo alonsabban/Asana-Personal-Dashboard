@@ -490,17 +490,18 @@
       <rect x="855" y="275" width="215" height="50" rx="8" fill="url(#f-red)" stroke="#ef4444" stroke-width="1.5"/>
 
       <!-- arrows flow 1 -->
+      <!-- box→box horizontal: right edge of source → left edge of target -->
       <line x1="245" y1="125" x2="303" y2="125" stroke="#00c4ff" stroke-width="1.5" marker-end="url(#fa)"/>
       <line x1="520" y1="125" x2="578" y2="125" stroke="#00c4ff" stroke-width="1.5" marker-end="url(#fa)"/>
       <line x1="795" y1="125" x2="853" y2="125" stroke="#00c4ff" stroke-width="1.5" marker-end="url(#fa)"/>
-      <!-- server→diamond -->
-      <line x1="687" y1="150" x2="687" y2="188" stroke="#00c4ff" stroke-width="1.5" marker-end="url(#fa)"/>
-      <!-- diamond→success -->
-      <line x1="687" y1="252" x2="687" y2="273" stroke="#10b981" stroke-width="1.5" marker-end="url(#fa-green)"/>
-      <!-- diamond→error -->
-      <line x1="730" y1="220" x2="853" y2="220" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
-      <line x1="963" y1="220" x2="963" y2="273" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fa-red)"/>
-      <!-- success→browser refresh -->
+      <!-- server box bottom (100+50=150) → diamond top (190) -->
+      <line x1="687" y1="150" x2="687" y2="190" stroke="#00c4ff" stroke-width="1.5" marker-end="url(#fa)"/>
+      <!-- diamond bottom (250) → success box top (275) -->
+      <line x1="687" y1="250" x2="687" y2="275" stroke="#10b981" stroke-width="1.5" marker-end="url(#fa-green)"/>
+      <!-- diamond right (730) → across to error box center-x (962), then down to error box top (275) -->
+      <line x1="730" y1="220" x2="962" y2="220" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <line x1="962" y1="220" x2="962" y2="275" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fa-red)"/>
+      <!-- success box left (580) → browser box right (520) -->
       <line x1="580" y1="300" x2="522" y2="300" stroke="#10b981" stroke-width="1.5" marker-end="url(#fa-green)"/>
 
       <!-- ══ FLOW 2: Inline Task Edit ══ (y offset 380) -->
@@ -578,11 +579,11 @@
       <text x="412" y="311" text-anchor="middle" fill="#93c5fd" font-size="10">refresh() called</text>
       <text x="962" y="295" text-anchor="middle" fill="#e2eaf6" font-size="11" font-weight="600">Error shown in UI</text>
       <text x="962" y="311" text-anchor="middle" fill="#ef4444" font-size="10">Invalid PAT or network</text>
-      <!-- diamond labels: ✓ yes = down arrow (left of line), ✗ no = right arrow (above line) -->
-      <rect x="695" y="255" width="44" height="16" rx="4" fill="#071929" stroke="#10b981" stroke-width="1"/>
-      <text x="717" y="267" text-anchor="middle" fill="#10b981" font-size="9">✓ yes</text>
-      <rect x="768" y="210" width="38" height="16" rx="4" fill="#071929" stroke="#ef4444" stroke-width="1"/>
-      <text x="787" y="222" text-anchor="middle" fill="#ef4444" font-size="9">✗ no</text>
+      <!-- diamond labels: ✓ yes = on downward arrow (right of line), ✗ no = on horizontal arrow (above midpoint) -->
+      <rect x="693" y="257" width="44" height="16" rx="4" fill="#071929" stroke="#10b981" stroke-width="1"/>
+      <text x="715" y="269" text-anchor="middle" fill="#10b981" font-size="9">✓ yes</text>
+      <rect x="816" y="208" width="38" height="16" rx="4" fill="#071929" stroke="#ef4444" stroke-width="1"/>
+      <text x="835" y="220" text-anchor="middle" fill="#ef4444" font-size="9">✗ no</text>
 
       <!-- Flow 2 labels -->
       <text x="10" y="370" fill="#f59e0b" font-size="10" font-weight="700" letter-spacing="1">FLOW 2 — INLINE TASK EDIT</text>
