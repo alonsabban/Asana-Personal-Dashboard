@@ -58,7 +58,8 @@ export async function handler(event) {
     const result = await client.send(new QueryCommand({
       TableName: TABLE,
       KeyConditionExpression: "userToken = :t",
-      FilterExpression: "consumed = :f",
+      FilterExpression: "#c = :f",
+      ExpressionAttributeNames: { "#c": "consumed" },
       ExpressionAttributeValues: {
         ":t": { S: userToken.trim() },
         ":f": { BOOL: false },
