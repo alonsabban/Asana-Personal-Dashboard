@@ -548,29 +548,28 @@ export default function TaskTable({
                         ))}
                       </select>
                     ) : task.status ? (
-                      <>
-                        <span
-                          className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
-                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                        >
-                          {task.status}
-                        </span>
-                        {subtaskInProgress.has(task.gid) && (
-                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳</span>
-                        )}
-                      </>
+                      <span
+                        className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
+                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        title={subtaskInProgress.has(task.gid) ? "A subtask is In Progress" : undefined}
+                      >
+                        {task.status}{subtaskInProgress.has(task.gid) ? " ↳" : ""}
+                      </span>
+                    ) : subtaskInProgress.has(task.gid) ? (
+                      <span
+                        className={`pill status status-in-progress${task.statusFieldGid ? " subj-clickable" : ""}`}
+                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        title="Derived from a subtask"
+                      >
+                        In Progress
+                      </span>
                     ) : (
-                      <>
-                        <span
-                          className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
-                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                        >
-                          {task.statusFieldGid ? "Set status" : "—"}
-                        </span>
-                        {subtaskInProgress.has(task.gid) && (
-                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳ In Progress</span>
-                        )}
-                      </>
+                      <span
+                        className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
+                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                      >
+                        {task.statusFieldGid ? "Set status" : "—"}
+                      </span>
                     )}
                   </td>
 
