@@ -26,6 +26,7 @@ export type AsanaTask = {
   createdAt: string | null;
   section: string | null;
   sectionGid: string | null;
+  subtaskInProgress: boolean;
 };
 
 export type AsanaBucket = "overdue" | "today" | "upcoming" | "noDue";
@@ -333,6 +334,17 @@ export async function getAsanaData(): Promise<AsanaData> {
   // 7-day window with a single field so the extra pages cost almost nothing.
   const completedCount = await countRecentlyCompleted(workspace.gid, token);
 
+  // Build a set of parent gids that have an in-progress subtask assigned to this user.
+  // Subtasks appear in the same fetch (they're assigned to me); we just check them before filtering.
+  const subtaskInProgressParents = new Set<string>();
+  for (const t of tasks) {
+    if (!t.parent?.gid || t.completed) continue;
+    const status = t.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status")?.enum_value?.name ?? null;
+    if (status?.toLowerCase().includes("in progress")) {
+      subtaskInProgressParents.add(t.parent.gid);
+    }
+  }
+
   // Phase 1: normalize without classification — exclude subtasks (tasks with a parent)
   const rawTasks = tasks.filter((t) => !t.parent?.gid).map((t) => {
     const projectGid = t.projects?.[0]?.gid ?? null;
@@ -356,6 +368,7 @@ export async function getAsanaData(): Promise<AsanaData> {
       createdAt: t.created_at ?? null,
       section: membership?.section?.name ?? null,
       sectionGid: membership?.section?.gid ?? null,
+      subtaskInProgress: subtaskInProgressParents.has(t.gid),
     };
   });
 

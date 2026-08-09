@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import type { AsanaTask, Subtask } from "@/app/lib/asana";
+import type { AsanaTask } from "@/app/lib/asana";
 import CommentsPanel from "@/app/components/CommentsPanel";
 import MentionTextarea from "@/app/components/MentionTextarea";
 
@@ -96,9 +96,7 @@ export default function TaskTable({
   });
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [expandedGid, setExp]   = useState<string | null>(null);
-  // tracks which parent task gids have at least one subtask with status "in progress"
-  const [subtaskInProgress, setSubtaskInProgress] = useState<Set<string>>(new Set());
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
 
   /* persist filter state */
@@ -551,11 +549,11 @@ export default function TaskTable({
                       <span
                         className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
                         onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                        title={subtaskInProgress.has(task.gid) ? "A subtask is In Progress" : undefined}
+                        title={task.subtaskInProgress ? "A subtask is In Progress" : undefined}
                       >
-                        {task.status}{subtaskInProgress.has(task.gid) ? " ↳" : ""}
+                        {task.status}{task.subtaskInProgress ? " ↳" : ""}
                       </span>
-                    ) : subtaskInProgress.has(task.gid) ? (
+                    ) : task.subtaskInProgress ? (
                       <span
                         className={`pill status status-in-progress${task.statusFieldGid ? " subj-clickable" : ""}`}
                         onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
@@ -732,19 +730,7 @@ export default function TaskTable({
                           </div>
                         </div>
                         <div className="detail-comments-col">
-                          <CommentsPanel
-                            gid={task.gid}
-                            onSubtasksLoaded={(subtasks: Subtask[]) => {
-                              const hasInProgress = subtasks.some(
-                                (s) => !s.completed && s.status?.toLowerCase().includes("in progress"),
-                              );
-                              setSubtaskInProgress((prev) => {
-                                const next = new Set(prev);
-                                hasInProgress ? next.add(task.gid) : next.delete(task.gid);
-                                return next;
-                              });
-                            }}
-                          />
+                          <CommentsPanel gid={task.gid} />
                         </div>
                       </div>
                     </td>
