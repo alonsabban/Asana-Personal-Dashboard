@@ -27,18 +27,15 @@ if errorlevel 1 goto no_node
 for /f "tokens=*" %%v in ('node -v 2^>nul') do set "NODEVER=%%v"
 echo   [OK] Node.js !NODEVER! found.
 
-rem ---------- 2. Is the dashboard already running? ----------
+rem ---------- 2. If already running, stop it so we start fresh ----------
 netstat -ano | findstr /r /c:"LISTENING" | findstr /c:":%PORT% " >nul 2>&1
 if not errorlevel 1 (
-    echo   [OK] Dashboard is already running.
-    echo.
-    echo   Opening %URL% ...
-    start "" "%URL%"
-    echo.
-    echo   Nothing else to do - you can close this window.
-    echo.
-    pause
-    exit /b 0
+    echo   [--] Dashboard already running - stopping it to apply updates...
+    for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:"LISTENING" ^| findstr /c:":%PORT% "') do (
+        taskkill /f /pid %%p >nul 2>&1
+    )
+    >nul timeout /t 2 /nobreak 2>nul
+    echo   [OK] Stopped.
 )
 
 rem ---------- 3. Pull latest updates ----------
