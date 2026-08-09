@@ -20,6 +20,7 @@ export default function DashboardHeader() {
   const projectCount = data?.byProject.length ?? 0;
 
   return (
+    <>
     <header className="topbar" id="tutorial-topbar">
       <div className="greeting">
         <Greeting name={firstName} />
@@ -43,5 +44,6 @@ export default function DashboardHeader() {
       </div>
     </header>
     {showVoiceSetup && <VoiceSetupModal onClose={() => setShowVoiceSetup(false)} />}
+    </>
   );
 }
