@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import type { AsanaTask } from "@/app/lib/asana";
+import type { AsanaTask, Subtask } from "@/app/lib/asana";
 import CommentsPanel from "@/app/components/CommentsPanel";
 import MentionTextarea from "@/app/components/MentionTextarea";
 
@@ -96,6 +96,8 @@ export default function TaskTable({
   });
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [expandedGid, setExp]   = useState<string | null>(null);
+  // tracks which parent task gids have at least one subtask with status "in progress"
+  const [subtaskInProgress, setSubtaskInProgress] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
 
@@ -546,19 +548,29 @@ export default function TaskTable({
                         ))}
                       </select>
                     ) : task.status ? (
-                      <span
-                        className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
-                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                      >
-                        {task.status}
-                      </span>
+                      <>
+                        <span
+                          className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
+                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        >
+                          {task.status}
+                        </span>
+                        {subtaskInProgress.has(task.gid) && (
+                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳</span>
+                        )}
+                      </>
                     ) : (
-                      <span
-                        className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
-                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                      >
-                        {task.statusFieldGid ? "Set status" : "—"}
-                      </span>
+                      <>
+                        <span
+                          className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
+                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        >
+                          {task.statusFieldGid ? "Set status" : "—"}
+                        </span>
+                        {subtaskInProgress.has(task.gid) && (
+                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳ In Progress</span>
+                        )}
+                      </>
                     )}
                   </td>
 
@@ -721,7 +733,19 @@ export default function TaskTable({
                           </div>
                         </div>
                         <div className="detail-comments-col">
-                          <CommentsPanel gid={task.gid} />
+                          <CommentsPanel
+                            gid={task.gid}
+                            onSubtasksLoaded={(subtasks: Subtask[]) => {
+                              const hasInProgress = subtasks.some(
+                                (s) => !s.completed && s.status?.toLowerCase().includes("in progress"),
+                              );
+                              setSubtaskInProgress((prev) => {
+                                const next = new Set(prev);
+                                hasInProgress ? next.add(task.gid) : next.delete(task.gid);
+                                return next;
+                              });
+                            }}
+                          />
                         </div>
                       </div>
                     </td>

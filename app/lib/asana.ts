@@ -520,6 +520,9 @@ export type Subtask = {
   completed: boolean;
   due: string | null;
   assignee: string | null;
+  status: string | null;
+  statusFieldGid: string | null;
+  statusOptions: { gid: string; name: string }[];
 };
 
 export type CustomField = {
@@ -735,18 +738,31 @@ export async function setTaskCompleted(
 export async function getSubtasks(parentGid: string): Promise<Subtask[]> {
   const token = await getToken();
   const raw = await asanaGet<
-    { gid: string; name: string; completed: boolean; due_on: string | null; assignee?: { name: string } | null }[]
+    {
+      gid: string;
+      name: string;
+      completed: boolean;
+      due_on: string | null;
+      assignee?: { name: string } | null;
+      custom_fields?: { gid: string; name: string; type: string; enum_value?: { name: string } | null; enum_options?: { gid: string; name: string }[] }[];
+    }[]
   >(
-    `/tasks/${parentGid}/subtasks?opt_fields=name,completed,due_on,assignee.name&limit=100`,
+    `/tasks/${parentGid}/subtasks?opt_fields=name,completed,due_on,assignee.name,custom_fields.gid,custom_fields.name,custom_fields.type,custom_fields.enum_value.name,custom_fields.enum_options.gid,custom_fields.enum_options.name&limit=100`,
     token,
   );
-  return raw.map((s) => ({
-    gid: s.gid,
-    name: s.name,
-    completed: s.completed,
-    due: s.due_on,
-    assignee: s.assignee?.name ?? null,
-  }));
+  return raw.map((s) => {
+    const statusField = s.custom_fields?.find((f) => f.type === "enum" && f.name.toLowerCase() === "status");
+    return {
+      gid: s.gid,
+      name: s.name,
+      completed: s.completed,
+      due: s.due_on,
+      assignee: s.assignee?.name ?? null,
+      status: statusField?.enum_value?.name ?? null,
+      statusFieldGid: statusField?.gid ?? null,
+      statusOptions: statusField?.enum_options ?? [],
+    };
+  });
 }
 
 /** Create a subtask under a parent task. */

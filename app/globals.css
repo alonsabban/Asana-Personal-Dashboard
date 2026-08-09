@@ -1494,6 +1494,16 @@ button {
   font-size: 11px;
   color: var(--text-faint);
 }
+.subtask-status-sel {
+  font-size: 11px;
+  padding: 1px 4px;
+  height: auto;
+}
+.subtask-status-badge {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.85;
+}
 
 /* ── Topbar text buttons (Feedback, Tutorial) ── */
 .topbar-text-btn {

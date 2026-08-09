@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import MentionTextarea from "@/app/components/MentionTextarea";
 
-type Comment  = { gid: string; text: string; author: string; createdAt: string };
-type Subtask  = { gid: string; name: string; completed: boolean; due: string | null };
+import type { Subtask } from "@/app/lib/asana";
 
-export default function CommentsPanel({ gid }: { gid: string }) {
+type Comment  = { gid: string; text: string; author: string; createdAt: string };
+
+export default function CommentsPanel({
+  gid,
+  onSubtasksLoaded,
+}: {
+  gid: string;
+  onSubtasksLoaded?: (subtasks: Subtask[]) => void;
+}) {
   /* ── comments ── */
   const [comments, setComments]     = useState<Comment[]>([]);
   const [loadingC, setLoadingC]     = useState(true);
@@ -20,6 +27,7 @@ export default function CommentsPanel({ gid }: { gid: string }) {
   const [newSub, setNewSub]         = useState("");
   const [addingSub, setAddingSub]   = useState(false);
   const [editSub, setEditSub]       = useState<{ gid: string; value: string } | null>(null);
+  const [editSubStatus, setEditSubStatus] = useState<string | null>(null); // subtask gid being status-edited
 
   /* ── loaders ── */
   const loadComments = useCallback(async () => {
@@ -40,7 +48,9 @@ export default function CommentsPanel({ gid }: { gid: string }) {
     try {
       const r = await fetch(`/api/asana/task/${gid}/subtasks`, { cache: "no-store" });
       const j = await r.json();
-      setSubtasks(j.subtasks ?? []);
+      const loaded: Subtask[] = j.subtasks ?? [];
+      setSubtasks(loaded);
+      onSubtasksLoaded?.(loaded);
     } catch { /* silently ignore */ }
     finally { setLoadingS(false); }
   }, [gid]);
@@ -111,6 +121,19 @@ export default function CommentsPanel({ gid }: { gid: string }) {
     } catch { /* ignore */ }
   }
 
+  async function saveSubtaskStatus(sub: Subtask, optionGid: string | null) {
+    setEditSubStatus(null);
+    if (!sub.statusFieldGid) return;
+    try {
+      await fetch(`/api/asana/task/${sub.gid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customFields: { [sub.statusFieldGid]: optionGid } }),
+      });
+      await loadSubtasks();
+    } catch { /* ignore */ }
+  }
+
   /* ── render ── */
   return (
     <div className="comments-panel">
@@ -152,6 +175,30 @@ export default function CommentsPanel({ gid }: { gid: string }) {
                   </span>
                 )}
                 {s.due && <span className="pill subtask-due">{s.due}</span>}
+                {s.statusFieldGid && (
+                  editSubStatus === s.gid ? (
+                    <select
+                      className="input subtask-status-sel"
+                      autoFocus
+                      defaultValue={s.statusOptions.find((o) => o.name === s.status)?.gid ?? ""}
+                      onChange={(e) => saveSubtaskStatus(s, e.target.value || null)}
+                      onBlur={() => setEditSubStatus(null)}
+                    >
+                      <option value="">—</option>
+                      {s.statusOptions.map((o) => (
+                        <option key={o.gid} value={o.gid}>{o.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span
+                      className={`pill status status-${(s.status ?? "none").toLowerCase().replace(/\s+/g, "-")} subj-clickable`}
+                      title="Click to change status"
+                      onClick={() => setEditSubStatus(s.gid)}
+                    >
+                      {s.status ?? "Set status"}
+                    </span>
+                  )
+                )}
               </div>
             ))}
           </div>
