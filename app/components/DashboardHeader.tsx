@@ -33,6 +33,7 @@ export default function DashboardHeader() {
         <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
           <Feedback />
           <Tutorial />
+          <a href="/docs.html" target="_blank" rel="noopener noreferrer" className="topbar-text-btn" title="Architecture docs">Docs</a>
         </div>
         <Clock />
       </div>
