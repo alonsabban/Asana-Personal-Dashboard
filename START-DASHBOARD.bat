@@ -94,20 +94,7 @@ echo   [OK] Dashboard is running.
 echo.
 echo   Opening %URL% ...
 start "" "%URL%"
-echo.
-echo   ===========================================
-echo     The first time, the dashboard will ask
-echo     for your Asana token. Follow the on-screen
-echo     steps - it explains where to get it.
-echo   ===========================================
-echo.
-echo   IMPORTANT: keep this window ^(and the small
-echo   minimised one^) open while using the dashboard.
-echo   Closing them stops it.
-echo.
-echo   Press any key to STOP the dashboard and exit.
-pause >nul
-goto shutdown
+exit /b 0
 
 :slow
 echo.
@@ -119,17 +106,6 @@ echo   and send it to Alon Sabban ^(asabban@paloaltonetworks.com^).
 echo.
 pause
 exit /b 1
-
-:shutdown
-echo.
-echo   Stopping the dashboard...
-rem Kill only the process listening on our port - never all of Node.
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r /c:"LISTENING" ^| findstr /c:":%PORT% "') do (
-    taskkill /f /pid %%p >nul 2>&1
-)
-echo   Done. You can close this window.
->nul timeout /t 2 /nobreak 2>nul
-exit /b 0
 
 :no_node
 echo   [X] Node.js is not installed on this PC.
