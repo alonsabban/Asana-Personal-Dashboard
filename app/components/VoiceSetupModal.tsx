@@ -144,26 +144,30 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {voicePageUrl && (
-            <div className="field">
-              <label className="field-label">Your voice page link</label>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  className="input"
-                  value={voicePageUrl}
-                  readOnly
-                  style={{ flex: 1, fontSize: 11, fontFamily: "monospace", color: "var(--accent)" }}
-                />
-                <button
-                  className="btn ghost"
-                  style={{ whiteSpace: "nowrap", fontSize: 12 }}
-                  onClick={copyLink}
-                  title="Copy link"
-                >
-                  {copied ? "Copied ✓" : "Copy"}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>
-                Open this URL on your phone to add tasks by voice. Bookmark it.
+            <div style={{
+              background: "rgba(0,196,255,0.06)",
+              border: "1px solid var(--accent)",
+              borderRadius: 10,
+              padding: "14px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}>
+              <p style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700, margin: 0 }}>
+                📱 Your mobile voice page
+              </p>
+              <p style={{ fontSize: 12, wordBreak: "break-all", color: "var(--text)", margin: 0, lineHeight: 1.6 }}>
+                {voicePageUrl}
+              </p>
+              <button
+                className="btn"
+                style={{ alignSelf: "flex-start", fontSize: 13 }}
+                onClick={copyLink}
+              >
+                {copied ? "Copied ✓" : "Copy link"}
+              </button>
+              <p style={{ fontSize: 11, color: "var(--text-faint)", margin: 0 }}>
+                Send this to your phone and bookmark it — use it to add tasks by voice from anywhere.
               </p>
             </div>
           )}
