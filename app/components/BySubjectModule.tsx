@@ -16,6 +16,7 @@ export default function BySubjectModule() {
     if (typeof window === "undefined") return "project";
     return (localStorage.getItem("taskGroupBy") as GroupBy) ?? "project";
   });
+  const [orderMode, setOrderMode] = useState(false);
 
   /* Invite subject setup once, right after connecting. */
   const [inviteSubjects, setInviteSubjects] = useState(false);
@@ -49,16 +50,29 @@ export default function BySubjectModule() {
               {(["subject", "project"] as GroupBy[]).map((g) => (
                 <button
                   key={g}
-                  className={`btn-group-by${groupBy === g ? " active" : ""}`}
-                  onClick={() => setGroupBy((v) => {
-                    const next = v === g ? "none" : g;
-                    localStorage.setItem("taskGroupBy", next);
-                    return next;
-                  })}
+                  className={`btn-group-by${groupBy === g && !orderMode ? " active" : ""}`}
+                  onClick={() => {
+                    setOrderMode(false);
+                    setGroupBy((v) => {
+                      const next = v === g ? "none" : g;
+                      localStorage.setItem("taskGroupBy", next);
+                      return next;
+                    });
+                  }}
                 >
                   {g === "subject" ? "By subject" : "By project"}
                 </button>
               ))}
+              <button
+                className={`btn-group-by${orderMode ? " active" : ""}`}
+                onClick={() => {
+                  setOrderMode((v) => !v);
+                  setGroupBy("none");
+                  localStorage.setItem("taskGroupBy", "none");
+                }}
+              >
+                Order
+              </button>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -105,7 +119,9 @@ export default function BySubjectModule() {
               tasks={allOpen}
               onChanged={refresh}
               availableSubjects={data.availableSubjects ?? []}
-              groupBy={groupBy}
+              groupBy={orderMode ? "none" : groupBy}
+              initialSortKey={orderMode ? "order" : undefined}
+              onSortKeyChange={(k) => { if (k !== "order") setOrderMode(false); }}
             />
           )}
         </div>

@@ -5,7 +5,7 @@ import type { AsanaTask } from "@/app/lib/asana";
 import CommentsPanel from "@/app/components/CommentsPanel";
 import MentionTextarea from "@/app/components/MentionTextarea";
 
-type SortKey = "name" | "subject" | "project" | "due" | "assignee" | "created";
+type SortKey = "name" | "subject" | "project" | "due" | "assignee" | "created" | "order";
 type SortDir = "asc" | "desc";
 type UserHit = { gid: string; name: string; email: string | null };
 type ColKey  = "status" | "subject" | "project" | "assignee";
@@ -21,7 +21,16 @@ function daysFromToday(due: string) {
 function subjClass(s: string) { return `subj-${s.toLowerCase().replace(/[^a-z]/g, "")}`; }
 function truncate(s: string, n = 90) { return s.length > n ? s.slice(0, n) + "…" : s; }
 
-function sortTasks(tasks: AsanaTask[], key: SortKey, dir: SortDir): AsanaTask[] {
+function sortTasks(tasks: AsanaTask[], key: SortKey, dir: SortDir, manualOrder?: string[]): AsanaTask[] {
+  if (key === "order" && manualOrder?.length) {
+    return [...tasks].sort((a, b) => {
+      const ai = manualOrder.indexOf(a.gid);
+      const bi = manualOrder.indexOf(b.gid);
+      const an = ai === -1 ? Infinity : ai;
+      const bn = bi === -1 ? Infinity : bi;
+      return dir === "asc" ? an - bn : bn - an;
+    });
+  }
   return [...tasks].sort((a, b) => {
     let cmp = 0;
     if (key === "name")     cmp = a.name.localeCompare(b.name);
@@ -75,14 +84,22 @@ export default function TaskTable({
   onChanged,
   availableSubjects = [],
   groupBy = "none",
+  initialSortKey,
+  onSortKeyChange,
 }: {
   tasks: AsanaTask[];
   onChanged: () => void | Promise<void>;
   availableSubjects?: string[];
   groupBy?: "none" | "subject" | "project";
+  initialSortKey?: SortKey;
+  onSortKeyChange?: (key: SortKey) => void;
 }) {
-  const [sortKey, setSortKey]   = useState<SortKey>("due");
+  const [sortKey, setSortKey]   = useState<SortKey>(initialSortKey ?? "due");
   const [sortDir, setSortDir]   = useState<SortDir>("asc");
+
+  useEffect(() => {
+    if (initialSortKey) { setSortKey(initialSortKey); setSortDir("asc"); }
+  }, [initialSortKey]);
   const [filter, setFilter]     = useState<string>(() => {
     try { return localStorage.getItem("taskFilter") ?? "all"; } catch { return "all"; }
   });
@@ -149,6 +166,18 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [savingName, setSavingName] = useState<string | null>(null);
   const nameClickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  /* drag-to-reorder (local only) */
+  const [manualOrder, setManualOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("taskManualOrder") ?? "[]"); } catch { return []; }
+  });
+  const [draggingGid, setDraggingGid] = useState<string | null>(null);
+  const [dragOverGid, setDragOverGid] = useState<string | null>(null);
+  const draggingRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("taskManualOrder", JSON.stringify(manualOrder)); } catch {}
+  }, [manualOrder]);
+
   const handleNameClick = useCallback((gid: string, currentName: string) => {
     if (nameClickTimers.current[gid]) {
       clearTimeout(nameClickTimers.current[gid]);
@@ -185,10 +214,99 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   /* complete */
   const [busyGid, setBusy] = useState<string | null>(null);
 
+  /* multi-select */
+  const [selectedGids, setSelectedGids] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  function toggleSelect(gid: string) {
+    setSelectedGids((prev) => {
+      const next = new Set(prev);
+      next.has(gid) ? next.delete(gid) : next.add(gid);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const visibleGids = displayed.flatMap((t) => [t.gid]);
+    const allSelected = visibleGids.every((g) => selectedGids.has(g));
+    if (allSelected) {
+      setSelectedGids(new Set());
+    } else {
+      setSelectedGids(new Set(visibleGids));
+    }
+  }
+
+  async function bulkComplete() {
+    const gids = [...selectedGids];
+    if (!gids.length) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        gids.map((gid) =>
+          fetch("/api/asana/complete", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gid, completed: true }),
+          }).catch(() => {}),
+        ),
+      );
+      setSelectedGids(new Set());
+      await onChanged();
+    } finally { setBulkBusy(false); }
+  }
+
+  async function bulkDelete() {
+    const gids = [...selectedGids];
+    if (!gids.length) return;
+    if (!window.confirm(`Delete ${gids.length} task${gids.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        gids.map((gid) =>
+          fetch(`/api/asana/task/${gid}`, { method: "DELETE" }).catch(() => {}),
+        ),
+      );
+      setSelectedGids(new Set());
+      await onChanged();
+    } finally { setBulkBusy(false); }
+  }
+
+  /* inline project picker */
+  const [editProject, setEditProject] = useState<string | null>(null); // gid being edited
+  const [projectSearch, setProjectSearch] = useState("");
+  const [projectHits, setProjectHits] = useState<{ gid: string; name: string }[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  function openProjectPicker(gid: string) {
+    setEditProject(gid);
+    setProjectSearch("");
+    setProjectHits([]);
+    setLoadingProjects(true);
+    fetch("/api/asana/projects", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setProjectHits(j.projects ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false));
+  }
+
+  function searchProjects(q: string) {
+    setProjectSearch(q);
+  }
+
+  async function pickProject(taskGid: string, projectGid: string) {
+    setEditProject(null);
+    try {
+      await fetch(`/api/asana/task/${taskGid}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectGid }),
+      });
+      await onChanged();
+    } catch { /* ignore */ }
+  }
+
   /* ── sort ── */
   function toggleSort(key: SortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
+    if (sortKey === key) { setSortDir((d) => (d === "asc" ? "desc" : "asc")); }
+    else { setSortKey(key); setSortDir("asc"); onSortKeyChange?.(key); }
   }
   function sortIcon(key: SortKey) {
     if (sortKey !== key) return <span className="sort-icon">⇅</span>;
@@ -250,7 +368,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
       }
       return true;
     });
-  const displayed = sortTasks(filtered, sortKey, sortDir);
+  const displayed = sortTasks(filtered, sortKey, sortDir, manualOrder);
 
   const groups: { label: string; tasks: AsanaTask[] }[] =
     groupBy === "subject"
@@ -395,6 +513,38 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     } catch { /* ignore */ }
   }
 
+  function handleDragStart(gid: string) {
+    draggingRef.current = gid;
+    setDraggingGid(gid);
+  }
+
+  function handleDragOver(e: React.DragEvent, gid: string) {
+    e.preventDefault();
+    if (gid !== draggingRef.current) setDragOverGid(gid);
+  }
+
+  function handleDrop(targetGid: string, currentDisplayed: AsanaTask[]) {
+    const from_gid = draggingRef.current;
+    if (!from_gid || from_gid === targetGid) { draggingRef.current = null; setDraggingGid(null); setDragOverGid(null); return; }
+    const base = currentDisplayed.map((t) => t.gid);
+    const from = base.indexOf(from_gid);
+    const to   = base.indexOf(targetGid);
+    if (from === -1 || to === -1) { draggingRef.current = null; setDraggingGid(null); setDragOverGid(null); return; }
+    const next = [...base];
+    next.splice(from, 1);
+    next.splice(to, 0, from_gid);
+    setManualOrder(next);
+    draggingRef.current = null;
+    setDraggingGid(null);
+    setDragOverGid(null);
+  }
+
+  function handleDragEnd() {
+    draggingRef.current = null;
+    setDraggingGid(null);
+    setDragOverGid(null);
+  }
+
   if (tasks.length === 0) return <div className="empty">No tasks.</div>;
 
   return (
@@ -416,10 +566,34 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
         <span className="table-count">{displayed.length} task{displayed.length !== 1 ? "s" : ""}</span>
       </div>
 
+      {selectedGids.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-count">{selectedGids.size} selected</span>
+          <button className="btn bulk-complete-btn" disabled={bulkBusy} onClick={bulkComplete}>
+            {bulkBusy ? "Working…" : `Complete ${selectedGids.size}`}
+          </button>
+          <button className="btn bulk-delete-btn" disabled={bulkBusy} onClick={bulkDelete}>
+            {bulkBusy ? "Working…" : `Delete ${selectedGids.size}`}
+          </button>
+          <button className="btn ghost" disabled={bulkBusy} onClick={() => setSelectedGids(new Set())}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       <table className="task-table">
         <thead>
           <tr>
-            <th className="th-check" />
+            <th className="th-drag" title="Drag to reorder" />
+            <th className="th-check">
+              <input
+                type="checkbox"
+                className="row-checkbox"
+                title="Select all"
+                checked={displayed.length > 0 && displayed.every((t) => selectedGids.has(t.gid))}
+                onChange={toggleSelectAll}
+              />
+            </th>
             <th className="th-name th-sortable"    onClick={() => toggleSort("name")}>Task {sortIcon("name")}</th>
             <th className="th-subj th-sortable"    onClick={() => toggleSort("subject")}>Subject {sortIcon("subject")}{filterIcon("subject")}</th>
             <th className="th-status">Status{filterIcon("status")}</th>
@@ -437,7 +611,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                 const isCollapsed = collapsedGroups.has(label);
                 return (
                   <tr className="group-header-tr group-header-clickable" onClick={() => toggleGroup(label)}>
-                    <td colSpan={9}>
+                    <td colSpan={10}>
                       <span className={`group-caret${isCollapsed ? "" : " open"}`}>▸</span>
                       {groupBy === "subject"
                         ? <span className={`pill subj ${subjClass(label)}`}>{label}</span>
@@ -459,12 +633,30 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
             return (
               <Fragment key={task.gid}>
-                <tr className={`task-tr${over ? " task-tr-over" : ""}${isExp ? " task-tr-exp" : ""}`}>
+                <tr
+                  className={`task-tr${over ? " task-tr-over" : ""}${isExp ? " task-tr-exp" : ""}${selectedGids.has(task.gid) ? " task-tr-selected" : ""}${draggingGid === task.gid ? " task-tr-dragging" : ""}${dragOverGid === task.gid ? " task-tr-drag-over" : ""}`}
+                  onDragOver={(e) => handleDragOver(e, task.gid)}
+                  onDrop={() => handleDrop(task.gid, displayed)}
+                >
+                  {/* drag handle */}
+                  <td className="td-drag"
+                    draggable
+                    onDragStart={() => handleDragStart(task.gid)}
+                    onDragEnd={handleDragEnd}
+                    title="Drag to reorder"
+                  >
+                    <span className="drag-handle">⠿</span>
+                  </td>
 
-                  {/* complete */}
+                  {/* select */}
                   <td className="td-check">
-                    <button className="task-check" title="Mark complete"
-                      disabled={busyGid === task.gid} onClick={() => completeTask(task.gid)}>✓</button>
+                    <input
+                      type="checkbox"
+                      className="row-checkbox"
+                      checked={selectedGids.has(task.gid)}
+                      onChange={() => toggleSelect(task.gid)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </td>
 
                   {/* name — single-click to edit, double-click to expand */}
@@ -563,7 +755,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                   </td>
 
                   {/* project */}
-                  <td className="td-proj">
+                  <td className="td-proj" style={{ position: "relative" }}>
                     {task.projectGid ? (
                       <a
                         href={`https://app.asana.com/0/${task.projectGid}/list`}
@@ -572,8 +764,43 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       >
                         {task.project}
                       </a>
+                    ) : editProject === task.gid ? (
+                      <div className="project-picker">
+                        <input
+                          className="input project-picker-input"
+                          placeholder="Search projects…"
+                          value={projectSearch}
+                          autoFocus
+                          onChange={(e) => searchProjects(e.target.value)}
+                          onBlur={() => setTimeout(() => setEditProject(null), 200)}
+                          onKeyDown={(e) => e.key === "Escape" && setEditProject(null)}
+                        />
+                        {loadingProjects && <div className="project-picker-loading">Loading…</div>}
+                        {!loadingProjects && projectHits.length > 0 && (
+                          <div className="project-picker-hits">
+                            {projectHits
+                              .filter((p) => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                              .slice(0, 8)
+                              .map((p) => (
+                                <button
+                                  key={p.gid}
+                                  className="project-picker-hit"
+                                  onMouseDown={() => pickProject(task.gid, p.gid)}
+                                >
+                                  {p.name}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      task.project
+                      <button
+                        className="add-project-btn"
+                        title="Add to project"
+                        onClick={() => openProjectPicker(task.gid)}
+                      >
+                        + project
+                      </button>
                     )}
                   </td>
 
@@ -673,7 +900,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                 {/* expanded row — description + comments/subtasks side by side */}
                 {isExp && (
                   <tr className="detail-tr">
-                    <td colSpan={9}>
+                    <td colSpan={10}>
                       <div className="detail-panel detail-panel-cols">
                         <div className="detail-desc-col">
                           <div className="expand-section-title">Description</div>
