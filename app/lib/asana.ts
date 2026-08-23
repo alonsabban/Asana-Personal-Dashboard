@@ -280,6 +280,7 @@ type RawTask = {
   created_by?: { name: string } | null;
   assignee?: { name: string } | null;
   custom_fields?: { gid: string; name: string; type: string; enum_value?: { name: string } | null; enum_options?: { gid: string; name: string }[] }[];
+  parent?: { gid: string } | null;
 };
 
 /**
@@ -769,6 +770,45 @@ export async function setTaskCompleted(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Asana ${res.status} updating task: ${body.slice(0, 300)}`);
+  }
+}
+
+/** Permanently delete a task. */
+export async function deleteTask(gid: string): Promise<void> {
+  const token = await getToken();
+  const res = await fetch(`${ASANA_API}/tasks/${gid}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Asana ${res.status} deleting task: ${body.slice(0, 300)}`);
+  }
+}
+
+/** Add a task to a project (and optionally a section). */
+export async function addTaskToProject(
+  taskGid: string,
+  projectGid: string,
+  sectionGid?: string | null,
+): Promise<void> {
+  const token = await getToken();
+  const res = await fetch(`${ASANA_API}/tasks/${taskGid}/addProject`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: {
+        project: projectGid,
+        ...(sectionGid ? { section: sectionGid } : {}),
+      },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Asana ${res.status} adding task to project: ${body.slice(0, 300)}`);
   }
 }
 
