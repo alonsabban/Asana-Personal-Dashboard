@@ -98,6 +98,23 @@ button {
   margin-top: 4px;
 }
 
+.daily-quip-banner {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 16px 0;
+}
+
+.daily-quip-banner span {
+  padding: 8px 20px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 20px;
+  color: var(--accent);
+  font-size: 14px;
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .clock {
   text-align: right;
   display: flex;

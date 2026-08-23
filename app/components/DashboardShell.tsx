@@ -7,6 +7,7 @@ import SearchBar from "@/app/components/SearchBar";
 import TodayFocus from "@/app/components/TodayFocus";
 import BySubjectModule from "@/app/components/BySubjectModule";
 import AsanaModule from "@/app/components/AsanaModule";
+import DailyQuip from "@/app/components/DailyQuip";
 
 /**
  * Decides between the first-run setup gate and the real dashboard. Nothing is
@@ -30,6 +31,8 @@ export default function DashboardShell() {
   return (
     <div className="shell">
       <DashboardHeader />
+
+      <DailyQuip />
 
       <div className="page-toolbar" id="tutorial-search">
         <SearchBar />
