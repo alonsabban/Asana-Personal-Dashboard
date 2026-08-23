@@ -81,6 +81,17 @@ button {
   letter-spacing: -0.02em;
 }
 
+.greeting-emoji {
+  font-size: 1em;
+  display: inline-block;
+  animation: greeting-float 3s ease-in-out infinite;
+}
+
+@keyframes greeting-float {
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-4px); }
+}
+
 .greeting p {
   color: var(--text-dim);
   font-size: 14px;
