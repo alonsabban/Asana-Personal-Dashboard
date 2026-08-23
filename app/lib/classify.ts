@@ -1,10 +1,6 @@
 import { readFile, writeFile, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  BedrockRuntimeClient,
-  InvokeModelCommand,
-} from "@aws-sdk/client-bedrock-runtime";
 import type { SubjectDef } from "@/app/lib/subjects";
 import { getSettings } from "@/app/lib/settings";
 
@@ -193,6 +189,7 @@ export async function verifyAwsCredentials(cfg: {
   const modelId = cfg.modelId?.trim() || DEFAULT_MODEL_ID;
 
   try {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
     const client = new BedrockRuntimeClient({
       region,
       credentials: {
@@ -393,6 +390,7 @@ async function callBedrock(
   );
 
   try {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
     const client = new BedrockRuntimeClient({
       region: aws.region,
       credentials: {

@@ -15,9 +15,10 @@ You need to do this **once**. About 5 minutes, most of it waiting.
 
 ### 1. Get the code
 
-Download this repository as a ZIP (green **Code** button → **Download ZIP**),
-then right-click the ZIP → **Extract All**. Put the folder somewhere you'll
-find it again, like your Documents.
+Go to <https://github.com/alonsabban/Asana-Personal-Dashboard> and download it
+as a ZIP (green **Code** button → **Download ZIP**), then right-click the ZIP →
+**Extract All**. Put the folder somewhere you'll find it again, like your
+Documents.
 
 ### 2. Double-click `START-DASHBOARD.bat`
 
@@ -51,7 +52,16 @@ Two things you can turn on, neither required:
   against AWS on save, so you'll know immediately if they're wrong. Without them
   everything stays as "Other" and you sort by hand.
 
-### 5. Set up subjects (optional)
+### 5. Add tasks by voice from your phone (optional)
+
+1. Click the **🎤 Voice** button in the top bar of the dashboard.
+2. Copy the personal link shown — open it on your phone (works from anywhere, no VPN needed).
+3. Tap the mic and speak your task. Natural dates like "next Tuesday" are understood automatically.
+4. Tasks land in your Asana the next time you hit **Refresh** on the dashboard.
+
+The link is personal — treat it like a password. You can regenerate it any time from the same 🎤 button.
+
+### 6. Set up subjects (optional)
 
 After your tasks load, the dashboard offers to let you sort them into your own
 categories ("Customer work", "Planning", whatever fits). **Entirely optional** —

@@ -53,12 +53,21 @@ export function AsanaProvider({ children }: { children: ReactNode }) {
       await fetch("/api/voice-poll", { cache: "no-store" }).catch(() => {});
 
       const res = await fetch("/api/asana/tasks", { cache: "no-store" });
-      const json = await res.json();
 
       // 428 → no token configured. Not an error state; it's first-run setup.
+      // Check status BEFORE parsing body — the response may be HTML on a
+      // module-load error (e.g. AWS SDK issue), which would throw on res.json().
       if (res.status === 428) {
         setNeedsSetup(true);
         setData(null);
+        return;
+      }
+
+      let json: Awaited<ReturnType<typeof res.json>>;
+      try {
+        json = await res.json();
+      } catch {
+        setError("Server error — restart the dashboard. If this is your first time, check dashboard-log.txt.");
         return;
       }
 
