@@ -3,9 +3,15 @@ Personal Asana Dashboard – Installation Instructions
 
 PREREQUISITES
 -------------
-You need Node.js installed once on your PC. You don't need admin rights.
+You need two things installed once on your PC.
 
+  First, request temporary admin permissions (needed for both installs):
+  Go to Company Portal --> look for "Temporary Admin" (or similar) and activate it.
+
+  Then install:
   1. Go to Company Portal --> look for "Node" and install
+  2. Go to Company Portal --> look for "Git" and install
+     After installing, open a new Command Prompt and confirm: git --version
 
 
 GETTING THE APP
@@ -15,7 +21,8 @@ GETTING THE APP
        cd %USERPROFILE%\Desktop
   3. Run:
        git clone https://github.com/alonsabban/Asana-Personal-Dashboard.git
-  4. This creates a folder called "personal-dashboard" — that's the app folder
+  4. This creates a folder called "Asana-Personal-Dashboard" — that's the app folder
+     By default it lands in C:\Users\your-name\Asana-Personal-Dashboard
 
 
 RUNNING THE DASHBOARD

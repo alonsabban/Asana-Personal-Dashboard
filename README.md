@@ -13,14 +13,39 @@ it, and nobody else can see them.
 
 You need to do this **once**. About 5 minutes, most of it waiting.
 
-### 1. Get the code
+### 1. Get temporary admin permissions
 
-Go to <https://github.com/alonsabban/Asana-Personal-Dashboard> and download it
-as a ZIP (green **Code** button → **Download ZIP**), then right-click the ZIP →
-**Extract All**. Put the folder somewhere you'll find it again, like your
-Documents.
+Both installs below require admin rights. Open **Company Portal**, search for
+**Temporary Admin Priviliges** (or similar), and activate it before continuing.
 
-### 2. Double-click `START-DASHBOARD.bat`
+### 2. Install Node.js and Git
+
+In **Company Portal**, search for and install both:
+- **Node** — runs the dashboard
+- **Git** — keeps it up to date automatically
+
+After installing, open a new Command Prompt and confirm it worked:
+
+```
+git --version
+```
+
+### 3. Get the code
+
+Open Command Prompt (press **Win+R**, type `cmd`, press Enter) and run:
+
+```
+git clone https://github.com/alonsabban/Asana-Personal-Dashboard.git
+```
+
+This creates a folder called **Asana-Personal-Dashboard** wherever you ran the
+command. By default that's your user folder (`C:\Users\your-name\`). You can
+navigate there first if you want it somewhere else — e.g. `cd %USERPROFILE%\Desktop`
+before cloning.
+
+### 4. Double-click `START-DASHBOARD.bat`
+
+Open the **Asana-Personal-Dashboard** folder and double-click `START-DASHBOARD.bat`.
 
 That's it. The launcher checks what's needed, sets it up the first time, starts
 the dashboard, and opens it in your browser.
@@ -32,7 +57,7 @@ If it tells you **Node.js is missing**, it will open <https://nodejs.org> for
 you. Download the big green **LTS** button, run the installer, click Next until
 it finishes, then double-click `START-DASHBOARD.bat` again.
 
-### 3. Paste your Asana token
+### 5. Paste your Asana token
 
 The dashboard will ask for one before it shows anything — it can't read your
 tasks without it. The on-screen instructions include the link, or go straight to
@@ -42,7 +67,7 @@ in.
 You only do this once. The token is checked with Asana immediately, so you'll
 know right away if it didn't paste correctly.
 
-### 4. Optional extras (⚙ gear icon)
+### 6. Optional extras (⚙ gear icon)
 
 Two things you can turn on, neither required:
 
@@ -52,7 +77,7 @@ Two things you can turn on, neither required:
   against AWS on save, so you'll know immediately if they're wrong. Without them
   everything stays as "Other" and you sort by hand.
 
-### 5. Add tasks by voice from your phone (optional)
+### 7. Add tasks by voice from your phone (optional)
 
 1. Click the **🎤 Voice** button in the top bar of the dashboard.
 2. Copy the personal link shown — open it on your phone (works from anywhere, no VPN needed).
@@ -61,7 +86,7 @@ Two things you can turn on, neither required:
 
 The link is personal — treat it like a password. You can regenerate it any time from the same 🎤 button.
 
-### 6. Set up subjects (optional)
+### 8. Set up subjects (optional)
 
 After your tasks load, the dashboard offers to let you sort them into your own
 categories ("Customer work", "Planning", whatever fits). **Entirely optional** —
@@ -92,7 +117,7 @@ To stop it, press any key in that window.
 
 ## If something goes wrong
 
-- **"Node.js is not installed"** → see step 2 above.
+- **"Node.js is not installed"** → see step 2 above (install from Company Portal).
 - **Setup can't finish / download errors** → usually the corporate network
   blocking npm. Send the window text to Alon Sabban.
 - **Blank page or won't load** → there's a `dashboard-log.txt` in the folder;

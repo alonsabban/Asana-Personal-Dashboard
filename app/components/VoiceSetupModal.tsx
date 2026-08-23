@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+
+const ADMIN_EMAIL = "asabban@paloaltonetworks.com";
 
 export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
   const [apiUrl, setApiUrl] = useState("");
@@ -10,9 +12,8 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const apiInputRef = useRef<HTMLInputElement>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
-  // Load existing settings on mount
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -20,17 +21,9 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
         const vb = j.voiceBroker;
         if (vb?.apiUrl)    setApiUrl(vb.apiUrl);
         if (vb?.mobileUrl) setMobileUrl(vb.mobileUrl);
-        if (vb?.userToken) {
-          setUserToken(vb.userToken);
-        } else {
-          // Generate a new token for this user on first open
-          setUserToken(crypto.randomUUID());
-        }
+        setUserToken(vb?.userToken || crypto.randomUUID());
       })
-      .catch(() => {
-        setUserToken(crypto.randomUUID());
-      });
-    apiInputRef.current?.focus();
+      .catch(() => setUserToken(crypto.randomUUID()));
   }, []);
 
   useEffect(() => {
@@ -44,8 +37,8 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
   async function save() {
     const trimmedApi = apiUrl.trim();
     const trimmedMobile = mobileUrl.trim();
-    if (!trimmedApi) { setError("API URL is required."); return; }
-    if (!trimmedApi.startsWith("https://")) { setError("API URL must start with https://"); return; }
+    if (!trimmedApi) { setError("Broker API URL is required."); return; }
+    if (!trimmedApi.startsWith("https://")) { setError("Broker API URL must start with https://"); return; }
 
     setSaving(true);
     setError(null);
@@ -91,14 +84,11 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="modal-body">
-          <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 16, lineHeight: 1.5 }}>
-            Deploy the voice broker to AWS (see <code style={{ fontSize: 11 }}>voice-broker/deploy.sh</code>),
-            then paste the URLs from the deploy output below.
-          </p>
 
           {error && <div className="banner" style={{ marginBottom: 12 }}>{error}</div>}
           {saved && <div className="banner" style={{ marginBottom: 12, borderColor: "var(--success)", color: "var(--success)" }}>Saved ✓</div>}
 
+          {/* Mobile link — main action */}
           <div style={{
             background: voicePageUrl ? "rgba(0,196,255,0.06)" : "rgba(255,255,255,0.02)",
             border: `1px solid ${voicePageUrl ? "var(--accent)" : "var(--border)"}`,
@@ -107,12 +97,16 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
             display: "flex",
             flexDirection: "column",
             gap: 8,
+            marginBottom: 20,
           }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: voicePageUrl ? "var(--accent)" : "var(--text-faint)", margin: 0 }}>
-              📱 Your mobile voice page link
+              📱 Your personal voice link
             </p>
             {voicePageUrl ? (
               <>
+                <p style={{ fontSize: 12, color: "var(--text-faint)", margin: 0 }}>
+                  Open this on your phone to add tasks by voice. Keep it private — it routes directly to your Asana.
+                </p>
                 <p style={{ fontSize: 13, wordBreak: "break-all", color: "var(--text)", margin: 0, lineHeight: 1.6 }}>
                   {voicePageUrl}
                 </p>
@@ -121,56 +115,56 @@ export default function VoiceSetupModal({ onClose }: { onClose: () => void }) {
                 </button>
               </>
             ) : (
-              <p style={{ fontSize: 12, color: "var(--text-faint)", margin: 0 }}>
-                Fill in the Mobile page URL below and save to generate your link.
+              <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0, lineHeight: 1.6 }}>
+                Fill in the two fields below to get your link. Don't have the values?{" "}
+                <a href={`mailto:${ADMIN_EMAIL}`} style={{ color: "var(--accent)" }}>Ask Alon Sabban</a>.
               </p>
             )}
           </div>
 
-          <div className="field">
-            <label className="field-label">Broker API URL</label>
-            <input
-              ref={apiInputRef}
-              className="input"
-              placeholder="https://abc123.execute-api.us-east-1.amazonaws.com"
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-            />
-          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-          <div className="field">
-            <label className="field-label">Mobile page URL (CloudFront)</label>
-            <input
-              className="input"
-              placeholder="https://d1234abcd.cloudfront.net"
-              value={mobileUrl}
-              onChange={(e) => setMobileUrl(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label className="field-label">Your token</label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label className="field-label">Broker API URL</label>
               <input
                 className="input"
-                value={userToken}
-                onChange={(e) => setUserToken(e.target.value)}
-                style={{ flex: 1, fontFamily: "monospace", fontSize: 12, color: "var(--text-faint)" }}
+                placeholder={`Ask ${ADMIN_EMAIL} for this value`}
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
               />
-              <button
-                className="btn ghost"
-                style={{ whiteSpace: "nowrap", fontSize: 12 }}
-                onClick={() => { navigator.clipboard.writeText(userToken); }}
-                title="Copy token"
-              >
-                Copy
-              </button>
             </div>
-            <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>
-              Auto-generated. Each person gets their own token — tasks route to their Asana only.
-            </p>
-          </div>
 
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label className="field-label">Mobile page URL</label>
+              <input
+                className="input"
+                placeholder={`Ask ${ADMIN_EMAIL} for this value`}
+                value={mobileUrl}
+                onChange={(e) => setMobileUrl(e.target.value)}
+              />
+            </div>
+
+            {/* Token — auto-generated, read-only */}
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label className="field-label" style={{ opacity: 0.5 }}>Your token — auto-generated, nothing to do here</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  className="input"
+                  value={userToken}
+                  readOnly
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12, opacity: 0.4, cursor: "default" }}
+                />
+                <button
+                  className="btn ghost"
+                  style={{ whiteSpace: "nowrap", fontSize: 12, opacity: 0.6 }}
+                  onClick={() => { navigator.clipboard.writeText(userToken); setTokenCopied(true); setTimeout(() => setTokenCopied(false), 2000); }}
+                >
+                  {tokenCopied ? "Copied ✓" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
 
         <div className="modal-foot">

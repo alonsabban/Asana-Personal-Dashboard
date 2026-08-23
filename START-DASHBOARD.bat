@@ -44,11 +44,18 @@ if errorlevel 1 (
     echo   [--] git not found - skipping update check.
 ) else (
     echo   Checking for updates...
-    git pull
+    git rev-parse --git-dir >nul 2>&1
     if errorlevel 1 (
-        echo   [!] Could not pull updates ^(no internet?^). Continuing with local version.
+        echo   [!] This folder was not cloned from GitHub - auto-update skipped.
+        echo       To enable updates, delete this folder and re-clone:
+        echo       git clone https://github.com/alonsabban/Asana-Personal-Dashboard.git
     ) else (
-        echo   [OK] Up to date.
+        git pull
+        if errorlevel 1 (
+            echo   [!] Could not pull updates ^(no internet?^). Continuing with local version.
+        ) else (
+            echo   [OK] Up to date.
+        )
     )
 )
 echo.
