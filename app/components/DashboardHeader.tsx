@@ -7,6 +7,7 @@ import Greeting from "@/app/components/Greeting";
 import Tutorial from "@/app/components/Tutorial";
 import Feedback from "@/app/components/Feedback";
 import VoiceSetupModal from "@/app/components/VoiceSetupModal";
+import { APP_VERSION } from "@/app/version";
 
 /**
  * Top section. Name and workspace provenance both come from Asana, so this must
@@ -39,6 +40,7 @@ export default function DashboardHeader() {
           <Tutorial />
           <button className="topbar-text-btn" onClick={() => setShowVoiceSetup(true)} title="Voice task setup">🎤 Voice</button>
           <a href="/docs.html" target="_blank" rel="noopener noreferrer" className="topbar-text-btn" title="Architecture docs">Docs</a>
+          <span className="topbar-version">V{APP_VERSION}</span>
         </div>
         <Clock />
       </div>

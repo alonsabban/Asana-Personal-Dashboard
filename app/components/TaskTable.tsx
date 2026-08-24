@@ -155,6 +155,13 @@ export default function TaskTable({
   const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
+  /* bulk selection */
+  const [selectedGids, setSelectedGids] = useState<Set<string>>(new Set());
+  function toggleSelect(gid: string) {
+    setSelectedGids((prev) => { const n = new Set(prev); n.has(gid) ? n.delete(gid) : n.add(gid); return n; });
+  }
+  function clearSelection() { setSelectedGids(new Set()); }
+
   const handleNameClick = useCallback((gid: string, currentName: string) => {
     if (nameClickTimers.current[gid]) {
       clearTimeout(nameClickTimers.current[gid]);
@@ -283,6 +290,26 @@ export default function TaskTable({
       setPendingDeletes((prev) => { const n = new Set(prev); n.delete(gid); return n; });
       showError("Failed to delete task.");
     }
+  }
+
+  async function bulkDelete() {
+    const gids = Array.from(selectedGids);
+    if (!gids.length) return;
+    const names = gids.map((g) => displayed.find((t) => t.gid === g)?.name ?? g);
+    if (!window.confirm(`Delete ${gids.length} task${gids.length > 1 ? "s" : ""}?\n\n${names.slice(0, 5).map((n) => `• ${n}`).join("\n")}${names.length > 5 ? `\n…and ${names.length - 5} more` : ""}\n\nThis permanently removes them from Asana.`)) return;
+    clearSelection();
+    setPendingDeletes((prev) => { const n = new Set(prev); gids.forEach((g) => n.add(g)); return n; });
+    const failed: string[] = [];
+    await Promise.all(gids.map(async (gid) => {
+      try {
+        const res = await fetch(`/api/asana/task/${gid}`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+      } catch {
+        failed.push(gid);
+        setPendingDeletes((prev) => { const n = new Set(prev); n.delete(gid); return n; });
+      }
+    }));
+    if (failed.length) showError(`Failed to delete ${failed.length} task${failed.length > 1 ? "s" : ""}.`);
   }
 
   /* hide tasks being optimistically completed or deleted */
@@ -506,10 +533,30 @@ export default function TaskTable({
         <span className="table-count">{displayed.length} task{displayed.length !== 1 ? "s" : ""}</span>
       </div>
 
+      {selectedGids.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-bar-count">{selectedGids.size} selected</span>
+          <button className="bulk-bar-btn bulk-bar-delete" onClick={bulkDelete}>
+            Delete {selectedGids.size > 1 ? `${selectedGids.size} tasks` : "task"}
+          </button>
+          <button className="bulk-bar-btn bulk-bar-cancel" onClick={clearSelection}>Cancel</button>
+        </div>
+      )}
+
       <table className="task-table">
         <thead>
           <tr>
-            <th className="th-check" />
+            <th className="th-check">
+              <input type="checkbox" className="task-select-cb"
+                title="Select all"
+                checked={displayed.length > 0 && displayed.every((t) => selectedGids.has(t.gid))}
+                ref={(el) => { if (el) el.indeterminate = displayed.some((t) => selectedGids.has(t.gid)) && !displayed.every((t) => selectedGids.has(t.gid)); }}
+                onChange={(e) => {
+                  if (e.target.checked) setSelectedGids(new Set(displayed.map((t) => t.gid)));
+                  else clearSelection();
+                }}
+              />
+            </th>
             <th className="th-name th-sortable"    onClick={() => toggleSort("name")}>Task {sortIcon("name")}</th>
             <th className="th-subj th-sortable"    onClick={() => toggleSort("subject")}>Subject {sortIcon("subject")}{filterIcon("subject")}</th>
             <th className="th-status">Status{filterIcon("status")}</th>
@@ -552,10 +599,13 @@ export default function TaskTable({
               <Fragment key={task.gid}>
                 <tr className={`task-tr${over ? " task-tr-over" : ""}${isExp ? " task-tr-exp" : ""}`}>
 
-                  {/* complete */}
+                  {/* select */}
                   <td className="td-check">
-                    <button className="task-check" title="Mark complete"
-                      disabled={busyGid === task.gid} onClick={() => completeTask(task.gid)}>✓</button>
+                    <input type="checkbox" className="task-select-cb"
+                      checked={selectedGids.has(task.gid)}
+                      onChange={() => toggleSelect(task.gid)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </td>
 
                   {/* name — single-click to edit, double-click to expand */}
