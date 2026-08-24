@@ -19,18 +19,28 @@ Private GitHub repo. Alon invites colleagues by GitHub username (repo → Settin
 
 ## Key components
 - `AsanaProvider` — shared data context, fetches on load
-- `TaskTable` — sortable/filterable/groupable table with inline editing (due, assignee, status, description, subject, task name). Expandable rows show description + comments/subtasks side by side
+- `TaskTable` — sortable/filterable/groupable table with inline editing (due, assignee, status, description, subject, task name). Expandable rows show description + comments/subtasks side by side. Checkbox column selects tasks for bulk delete; hover reveals a per-row trash button for single delete
 - `BySubjectModule` — tasks grouped by subject taxonomy
 - `TodayFocus` — overdue + today + this-week summary card
 - `SetupGate` — first-run modal that collects and validates the Asana PAT
 - `SubjectSettings` — modal to rename subjects and edit classification hints
 - `Tutorial` — 7-step balloon tutorial triggered from topbar
 - `MentionTextarea` — @mention typeahead used in comments and description editors
+- `DashboardHeader` — top bar; imports `APP_VERSION` from `app/version.ts` and shows it as a version badge
 
 ## Task name editing
 Single-click a task name → inline text input to rename it (saves to Asana on Enter/blur).
 Double-click a task name → expands the detail row.
 Caret (▸) always toggles expand independently.
+
+## Task deletion
+- Hover a task row → trash button (🗑) appears at the end of the task name → single-task delete with confirmation
+- Checkbox in the leftmost column → selects tasks for bulk delete → "Delete N tasks" action bar appears above the table → confirmation dialog lists task names before deleting
+- Checkbox does NOT complete tasks — completion is done via the status column inline editor
+- Backend: `deleteTask()` in `app/lib/asana.ts`, DELETE `/api/asana/task/[gid]`
+
+## Version badge
+`app/version.ts` exports `APP_VERSION`. Shown as `V1.x` in the topbar. Increment the number manually in that file with every commit that changes the app.
 
 ## AsanaTask type fields
 gid, name, project, projectGid, due, completed, permalink, subject, track, createdBy, assignee, notes, status, statusFieldGid, statusOptions[], createdAt, section, sectionGid
