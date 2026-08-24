@@ -2,8 +2,21 @@
 
 import { useEffect, useState } from "react";
 
+const TIME_SLOTS = [
+  { maxHour:  5, label: "Good night",      emoji: "🌙" },
+  { maxHour: 12, label: "Good morning",    emoji: "🌅" },
+  { maxHour: 14, label: "Good noon",       emoji: "☀️" },
+  { maxHour: 18, label: "Good afternoon",  emoji: "🌇" },
+  { maxHour: 21, label: "Good evening",    emoji: "🌆" },
+  { maxHour: 24, label: "Good night",      emoji: "🌙" },
+];
+
+function getSlot(h: number) {
+  return TIME_SLOTS.find((s) => h < s.maxHour) ?? TIME_SLOTS[TIME_SLOTS.length - 1];
+}
+
 export default function Greeting({ name }: { name?: string | null }) {
-  const [part, setPart] = useState("Hello");
+  const [slot, setSlot] = useState(TIME_SLOTS[1]);
 
   useEffect(() => {
     const timerRef = { current: 0 as ReturnType<typeof setTimeout> };
@@ -11,13 +24,14 @@ export default function Greeting({ name }: { name?: string | null }) {
     function schedule() {
       const now = new Date();
       const h = now.getHours();
-      setPart(h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
+      setSlot(getSlot(h));
 
-      // fire again exactly at the next phase boundary (midnight, noon, 6 pm)
+      // fire again at the next slot boundary
       const next = new Date(now);
-      if (h < 12)      next.setHours(12, 0, 0, 0);
-      else if (h < 18) next.setHours(18, 0, 0, 0);
-      else             { next.setDate(next.getDate() + 1); next.setHours(0, 0, 0, 0); }
+      const nextBoundary = TIME_SLOTS.find((s) => h < s.maxHour && s.maxHour > h)?.maxHour
+        ?? TIME_SLOTS[0].maxHour + 24;
+      next.setHours(nextBoundary < 24 ? nextBoundary : 0, 0, 0, 0);
+      if (nextBoundary >= 24) next.setDate(next.getDate() + 1);
 
       timerRef.current = setTimeout(schedule, next.getTime() - now.getTime());
     }
@@ -27,8 +41,9 @@ export default function Greeting({ name }: { name?: string | null }) {
   }, []);
 
   return (
-    <h1 suppressHydrationWarning>
-      {name ? `${part}, ${name}` : part}
+    <h1 suppressHydrationWarning style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+      {name ? `${slot.label}, ${name}` : slot.label}
+      <span className="greeting-emoji" aria-hidden>{slot.emoji}</span>
     </h1>
   );
 }

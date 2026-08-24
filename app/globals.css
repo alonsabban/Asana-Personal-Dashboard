@@ -1839,3 +1839,15 @@ button {
   font-style: italic;
   white-space: nowrap;
 }
+
+/* Greeting time-of-day emoji */
+.greeting-emoji {
+  font-size: 1em;
+  display: inline-block;
+  animation: greeting-float 3s ease-in-out infinite;
+}
+
+@keyframes greeting-float {
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-4px); }
+}
