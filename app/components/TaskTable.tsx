@@ -152,6 +152,7 @@ export default function TaskTable({
 
   /* optimistic updates — apply changes locally before the API call returns */
   const [pendingUpdates, setPendingUpdates] = useState<Map<string, Partial<AsanaTask>>>(new Map());
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set());
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const handleNameClick = useCallback((gid: string, currentName: string) => {
@@ -272,8 +273,20 @@ export default function TaskTable({
     setColumnFilters((prev) => { const next = new Map(prev); next.delete(col); return next; });
   }
 
-  /* hide tasks being optimistically completed */
-  const visibleTasks = tasks.filter((t) => !pendingUpdates.get(t.gid)?.completed);
+  async function handleDeleteTask(gid: string, name: string) {
+    if (!window.confirm(`Delete "${name}"?\n\nThis permanently removes the task from Asana.`)) return;
+    setPendingDeletes((prev) => new Set(prev).add(gid));
+    try {
+      const res = await fetch(`/api/asana/task/${gid}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+    } catch {
+      setPendingDeletes((prev) => { const n = new Set(prev); n.delete(gid); return n; });
+      showError("Failed to delete task.");
+    }
+  }
+
+  /* hide tasks being optimistically completed or deleted */
+  const visibleTasks = tasks.filter((t) => !pendingUpdates.get(t.gid)?.completed && !pendingDeletes.has(t.gid));
 
   const filtered = visibleTasks
     .filter((t) => filter === "all" || t.subject === filter)
@@ -579,6 +592,11 @@ export default function TaskTable({
                           {dt.name}
                         </span>
                       )}
+                      <button
+                        className="task-delete-btn"
+                        title="Delete task"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.gid, dt.name); }}
+                      >🗑</button>
                     </div>
                   </td>
 
