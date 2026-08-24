@@ -1,11 +1,11 @@
 "use client";
 
 import { Fragment, forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import type { AsanaTask } from "@/app/lib/asana";
+import type { AsanaTask, Subtask } from "@/app/lib/asana";
 import CommentsPanel from "@/app/components/CommentsPanel";
 import MentionTextarea from "@/app/components/MentionTextarea";
 
-type SortKey = "name" | "subject" | "project" | "due" | "assignee" | "created" | "order";
+type SortKey = "name" | "subject" | "project" | "due" | "assignee" | "created";
 type SortDir = "asc" | "desc";
 type UserHit = { gid: string; name: string; email: string | null };
 type ColKey  = "status" | "subject" | "project" | "assignee";
@@ -21,16 +21,7 @@ function daysFromToday(due: string) {
 function subjClass(s: string) { return `subj-${s.toLowerCase().replace(/[^a-z]/g, "")}`; }
 function truncate(s: string, n = 90) { return s.length > n ? s.slice(0, n) + "…" : s; }
 
-function sortTasks(tasks: AsanaTask[], key: SortKey, dir: SortDir, manualOrder?: string[]): AsanaTask[] {
-  if (key === "order" && manualOrder?.length) {
-    return [...tasks].sort((a, b) => {
-      const ai = manualOrder.indexOf(a.gid);
-      const bi = manualOrder.indexOf(b.gid);
-      const an = ai === -1 ? Infinity : ai;
-      const bn = bi === -1 ? Infinity : bi;
-      return dir === "asc" ? an - bn : bn - an;
-    });
-  }
+function sortTasks(tasks: AsanaTask[], key: SortKey, dir: SortDir): AsanaTask[] {
   return [...tasks].sort((a, b) => {
     let cmp = 0;
     if (key === "name")     cmp = a.name.localeCompare(b.name);
@@ -84,22 +75,14 @@ export default function TaskTable({
   onChanged,
   availableSubjects = [],
   groupBy = "none",
-  initialSortKey,
-  onSortKeyChange,
 }: {
   tasks: AsanaTask[];
   onChanged: () => void | Promise<void>;
   availableSubjects?: string[];
   groupBy?: "none" | "subject" | "project";
-  initialSortKey?: SortKey;
-  onSortKeyChange?: (key: SortKey) => void;
 }) {
-  const [sortKey, setSortKey]   = useState<SortKey>(initialSortKey ?? "due");
+  const [sortKey, setSortKey]   = useState<SortKey>("due");
   const [sortDir, setSortDir]   = useState<SortDir>("asc");
-
-  useEffect(() => {
-    if (initialSortKey) { setSortKey(initialSortKey); setSortDir("asc"); }
-  }, [initialSortKey]);
   const [filter, setFilter]     = useState<string>(() => {
     try { return localStorage.getItem("taskFilter") ?? "all"; } catch { return "all"; }
   });
@@ -113,7 +96,8 @@ export default function TaskTable({
   });
   const [openFilterCol, setOpenFilterCol] = useState<string | null>(null);
   const [expandedGid, setExp]   = useState<string | null>(null);
-const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [subtaskInProgress, setSubtaskInProgress] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
 
   /* persist filter state */
@@ -151,32 +135,24 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const asgnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* section inline edit */
-  const [editSection, setEditSection] = useState<string | null>(null); // gid being edited
+  const [editSection, setEditSection] = useState<string | null>(null);
   const [sectionOptions, setSectionOptions] = useState<{ gid: string; name: string }[]>([]);
   const [loadingSections, setLoadingSections] = useState(false);
 
   /* subject inline edit */
-  const [editSubj, setEditSubj] = useState<string | null>(null); // gid being edited
+  const [editSubj, setEditSubj] = useState<string | null>(null);
 
   /* status inline edit */
-  const [editStatus, setEditStatus] = useState<string | null>(null); // gid being edited
+  const [editStatus, setEditStatus] = useState<string | null>(null);
 
   /* name inline edit */
   const [editName, setEditName] = useState<{ gid: string; value: string } | null>(null);
   const [savingName, setSavingName] = useState<string | null>(null);
   const nameClickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  /* drag-to-reorder (local only) */
-  const [manualOrder, setManualOrder] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("taskManualOrder") ?? "[]"); } catch { return []; }
-  });
-  const [draggingGid, setDraggingGid] = useState<string | null>(null);
-  const [dragOverGid, setDragOverGid] = useState<string | null>(null);
-  const draggingRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    try { localStorage.setItem("taskManualOrder", JSON.stringify(manualOrder)); } catch {}
-  }, [manualOrder]);
+  /* optimistic updates — apply changes locally before the API call returns */
+  const [pendingUpdates, setPendingUpdates] = useState<Map<string, Partial<AsanaTask>>>(new Map());
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const handleNameClick = useCallback((gid: string, currentName: string) => {
     if (nameClickTimers.current[gid]) {
@@ -198,115 +174,52 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     setExp((g) => g === gid ? null : gid);
   }, []);
 
+  function applyPending(gid: string, update: Partial<AsanaTask>) {
+    setPendingUpdates((prev) => {
+      const next = new Map(prev);
+      next.set(gid, { ...(next.get(gid) ?? {}), ...update });
+      return next;
+    });
+  }
+  function dropPending(gid: string) {
+    setPendingUpdates((prev) => { const next = new Map(prev); next.delete(gid); return next; });
+  }
+  function mergeTask(task: AsanaTask): AsanaTask {
+    const p = pendingUpdates.get(task.gid);
+    return p ? { ...task, ...p } : task;
+  }
+  function showError(msg: string) {
+    setErrorToast(msg);
+    setTimeout(() => setErrorToast(null), 4000);
+  }
+
   async function saveName(gid: string, value: string, original: string) {
     setEditName(null);
     if (value.trim() === original) return;
+    applyPending(gid, { name: value.trim() });
     setSavingName(gid);
     try {
-      await fetch(`/api/asana/task/${gid}`, {
+      const r = await fetch(`/api/asana/task/${gid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: value.trim() }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } finally { setSavingName(null); }
+    } catch {
+      showError("Failed to rename task");
+    } finally {
+      dropPending(gid);
+      setSavingName(null);
+    }
   }
 
   /* complete */
   const [busyGid, setBusy] = useState<string | null>(null);
 
-  /* multi-select */
-  const [selectedGids, setSelectedGids] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
-
-  function toggleSelect(gid: string) {
-    setSelectedGids((prev) => {
-      const next = new Set(prev);
-      next.has(gid) ? next.delete(gid) : next.add(gid);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    const visibleGids = displayed.flatMap((t) => [t.gid]);
-    const allSelected = visibleGids.every((g) => selectedGids.has(g));
-    if (allSelected) {
-      setSelectedGids(new Set());
-    } else {
-      setSelectedGids(new Set(visibleGids));
-    }
-  }
-
-  async function bulkComplete() {
-    const gids = [...selectedGids];
-    if (!gids.length) return;
-    setBulkBusy(true);
-    try {
-      await Promise.all(
-        gids.map((gid) =>
-          fetch("/api/asana/complete", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ gid, completed: true }),
-          }).catch(() => {}),
-        ),
-      );
-      setSelectedGids(new Set());
-      await onChanged();
-    } finally { setBulkBusy(false); }
-  }
-
-  async function bulkDelete() {
-    const gids = [...selectedGids];
-    if (!gids.length) return;
-    if (!window.confirm(`Delete ${gids.length} task${gids.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
-    setBulkBusy(true);
-    try {
-      await Promise.all(
-        gids.map((gid) =>
-          fetch(`/api/asana/task/${gid}`, { method: "DELETE" }).catch(() => {}),
-        ),
-      );
-      setSelectedGids(new Set());
-      await onChanged();
-    } finally { setBulkBusy(false); }
-  }
-
-  /* inline project picker */
-  const [editProject, setEditProject] = useState<string | null>(null); // gid being edited
-  const [projectSearch, setProjectSearch] = useState("");
-  const [projectHits, setProjectHits] = useState<{ gid: string; name: string }[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-
-  function openProjectPicker(gid: string) {
-    setEditProject(gid);
-    setProjectSearch("");
-    setProjectHits([]);
-    setLoadingProjects(true);
-    fetch("/api/asana/projects", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => setProjectHits(j.projects ?? []))
-      .catch(() => {})
-      .finally(() => setLoadingProjects(false));
-  }
-
-  function searchProjects(q: string) {
-    setProjectSearch(q);
-  }
-
-  async function pickProject(taskGid: string, projectGid: string) {
-    setEditProject(null);
-    try {
-      await fetch(`/api/asana/task/${taskGid}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectGid }),
-      });
-      await onChanged();
-    } catch { /* ignore */ }
-  }
-
   /* ── sort ── */
   function toggleSort(key: SortKey) {
-    if (sortKey === key) { setSortDir((d) => (d === "asc" ? "desc" : "asc")); }
-    else { setSortKey(key); setSortDir("asc"); onSortKeyChange?.(key); }
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
   }
   function sortIcon(key: SortKey) {
     if (sortKey !== key) return <span className="sort-icon">⇅</span>;
@@ -358,7 +271,11 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   function clearColFilter(col: ColKey) {
     setColumnFilters((prev) => { const next = new Map(prev); next.delete(col); return next; });
   }
-  const filtered = tasks
+
+  /* hide tasks being optimistically completed */
+  const visibleTasks = tasks.filter((t) => !pendingUpdates.get(t.gid)?.completed);
+
+  const filtered = visibleTasks
     .filter((t) => filter === "all" || t.subject === filter)
     .filter((t) => {
       for (const [col, vals] of columnFilters) {
@@ -368,7 +285,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
       }
       return true;
     });
-  const displayed = sortTasks(filtered, sortKey, sortDir, manualOrder);
+  const displayed = sortTasks(filtered, sortKey, sortDir);
 
   const groups: { label: string; tasks: AsanaTask[] }[] =
     groupBy === "subject"
@@ -381,7 +298,6 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
           .map((p) => ({ label: p, tasks: sortTasks(filtered.filter((t) => t.project === p), sortKey, sortDir) }))
       : [{ label: "", tasks: displayed }];
 
-  // Seed all groups as collapsed the first time grouping is active, and whenever groupBy mode changes.
   if (groupBy !== "none" && seededGroupBy.current !== groupBy) {
     seededGroupBy.current = groupBy;
     const allLabels = new Set(groups.map((g) => g.label));
@@ -404,36 +320,53 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   /* ── actions ── */
   async function completeTask(gid: string) {
     setBusy(gid);
+    applyPending(gid, { completed: true });
     try {
-      await fetch("/api/asana/complete", {
+      const r = await fetch("/api/asana/complete", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gid, completed: true }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
+    } catch {
+      dropPending(gid);
+      showError("Failed to complete task");
     } finally { setBusy(null); }
   }
 
   async function saveDue(gid: string, value: string) {
     setEditDue(null);
+    const newDue = value || null;
+    applyPending(gid, { due: newDue });
     try {
-      await fetch(`/api/asana/task/${gid}`, {
+      const r = await fetch(`/api/asana/task/${gid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ due: value || null }),
+        body: JSON.stringify({ due: newDue }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } catch { /* ignore */ }
+    } catch {
+      showError("Failed to update due date");
+    } finally { dropPending(gid); }
   }
 
   async function saveDesc(gid: string, value: string, htmlNotes?: string | null) {
     setSavingDesc(gid);
     setEditDesc(null);
+    applyPending(gid, { notes: value });
     try {
-      await fetch(`/api/asana/task/${gid}`, {
+      const r = await fetch(`/api/asana/task/${gid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(htmlNotes ? { htmlNotes } : { notes: value }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } finally { setSavingDesc(null); }
+    } catch {
+      showError("Failed to save description");
+    } finally {
+      dropPending(gid);
+      setSavingDesc(null);
+    }
   }
 
   function startAsgnEdit(gid: string, currentName: string | null) {
@@ -453,39 +386,57 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     }, 220);
   }
 
-  async function pickAssignee(taskGid: string, userGid: string | null) {
+  async function pickAssignee(taskGid: string, userGid: string | null, userName?: string | null) {
     setEditAsgn(null);
     setSavingAsgn(taskGid);
+    applyPending(taskGid, { assignee: userGid === null ? null : (userName ?? null) });
     try {
-      await fetch(`/api/asana/task/${taskGid}`, {
+      const r = await fetch(`/api/asana/task/${taskGid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignee: userGid }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } finally { setSavingAsgn(null); }
+    } catch {
+      showError("Failed to update assignee");
+    } finally {
+      dropPending(taskGid);
+      setSavingAsgn(null);
+    }
   }
 
   async function saveSubject(gid: string, subject: string) {
     setEditSubj(null);
+    applyPending(gid, { subject });
     try {
-      await fetch("/api/asana/classify", {
+      const r = await fetch("/api/asana/classify", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gid, subject }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } catch { /* ignore */ }
+    } catch {
+      showError("Failed to update subject");
+    } finally { dropPending(gid); }
   }
 
   async function saveStatus(task: AsanaTask, optionGid: string | null) {
     setEditStatus(null);
     if (!task.statusFieldGid) return;
+    const newStatus = optionGid
+      ? (task.statusOptions.find((o) => o.gid === optionGid)?.name ?? null)
+      : null;
+    applyPending(task.gid, { status: newStatus });
     try {
-      await fetch(`/api/asana/task/${task.gid}`, {
+      const r = await fetch(`/api/asana/task/${task.gid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customFields: { [task.statusFieldGid]: optionGid } }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } catch { /* ignore */ }
+    } catch {
+      showError("Failed to update status");
+    } finally { dropPending(task.gid); }
   }
 
   async function startSectionEdit(task: AsanaTask) {
@@ -504,57 +455,33 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   async function saveSection(taskGid: string, sectionGid: string) {
     setEditSection(null);
+    const newSection = sectionOptions.find((s) => s.gid === sectionGid)?.name ?? null;
+    applyPending(taskGid, { section: newSection, sectionGid });
     try {
-      await fetch(`/api/asana/task/${taskGid}`, {
+      const r = await fetch(`/api/asana/task/${taskGid}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sectionGid }),
       });
+      if (!r.ok) throw new Error();
       await onChanged();
-    } catch { /* ignore */ }
-  }
-
-  function handleDragStart(gid: string) {
-    draggingRef.current = gid;
-    setDraggingGid(gid);
-  }
-
-  function handleDragOver(e: React.DragEvent, gid: string) {
-    e.preventDefault();
-    if (gid !== draggingRef.current) setDragOverGid(gid);
-  }
-
-  function handleDrop(targetGid: string, currentDisplayed: AsanaTask[]) {
-    const from_gid = draggingRef.current;
-    if (!from_gid || from_gid === targetGid) { draggingRef.current = null; setDraggingGid(null); setDragOverGid(null); return; }
-    const base = currentDisplayed.map((t) => t.gid);
-    const from = base.indexOf(from_gid);
-    const to   = base.indexOf(targetGid);
-    if (from === -1 || to === -1) { draggingRef.current = null; setDraggingGid(null); setDragOverGid(null); return; }
-    const next = [...base];
-    next.splice(from, 1);
-    next.splice(to, 0, from_gid);
-    setManualOrder(next);
-    draggingRef.current = null;
-    setDraggingGid(null);
-    setDragOverGid(null);
-  }
-
-  function handleDragEnd() {
-    draggingRef.current = null;
-    setDraggingGid(null);
-    setDragOverGid(null);
+    } catch {
+      showError("Failed to update group");
+    } finally { dropPending(taskGid); }
   }
 
   if (tasks.length === 0) return <div className="empty">No tasks.</div>;
 
   return (
     <div className="task-table-wrap">
+      {errorToast && (
+        <div className="optimistic-error-toast">{errorToast}</div>
+      )}
       <div className="table-toolbar">
         {subjects.length > 1 && (
           <select className="input table-filter-sel" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All subjects ({tasks.length})</option>
+            <option value="all">All subjects ({visibleTasks.length})</option>
             {subjects.map((s) => (
-              <option key={s} value={s}>{s} ({tasks.filter((t) => t.subject === s).length})</option>
+              <option key={s} value={s}>{s} ({visibleTasks.filter((t) => t.subject === s).length})</option>
             ))}
           </select>
         )}
@@ -566,34 +493,10 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
         <span className="table-count">{displayed.length} task{displayed.length !== 1 ? "s" : ""}</span>
       </div>
 
-      {selectedGids.size > 0 && (
-        <div className="bulk-action-bar">
-          <span className="bulk-count">{selectedGids.size} selected</span>
-          <button className="btn bulk-complete-btn" disabled={bulkBusy} onClick={bulkComplete}>
-            {bulkBusy ? "Working…" : `Complete ${selectedGids.size}`}
-          </button>
-          <button className="btn bulk-delete-btn" disabled={bulkBusy} onClick={bulkDelete}>
-            {bulkBusy ? "Working…" : `Delete ${selectedGids.size}`}
-          </button>
-          <button className="btn ghost" disabled={bulkBusy} onClick={() => setSelectedGids(new Set())}>
-            Cancel
-          </button>
-        </div>
-      )}
-
       <table className="task-table">
         <thead>
           <tr>
-            <th className="th-drag" title="Drag to reorder" />
-            <th className="th-check">
-              <input
-                type="checkbox"
-                className="row-checkbox"
-                title="Select all"
-                checked={displayed.length > 0 && displayed.every((t) => selectedGids.has(t.gid))}
-                onChange={toggleSelectAll}
-              />
-            </th>
+            <th className="th-check" />
             <th className="th-name th-sortable"    onClick={() => toggleSort("name")}>Task {sortIcon("name")}</th>
             <th className="th-subj th-sortable"    onClick={() => toggleSort("subject")}>Subject {sortIcon("subject")}{filterIcon("subject")}</th>
             <th className="th-status">Status{filterIcon("status")}</th>
@@ -611,7 +514,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                 const isCollapsed = collapsedGroups.has(label);
                 return (
                   <tr className="group-header-tr group-header-clickable" onClick={() => toggleGroup(label)}>
-                    <td colSpan={10}>
+                    <td colSpan={9}>
                       <span className={`group-caret${isCollapsed ? "" : " open"}`}>▸</span>
                       {groupBy === "subject"
                         ? <span className={`pill subj ${subjClass(label)}`}>{label}</span>
@@ -623,7 +526,8 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                 );
               })()}
               {!collapsedGroups.has(label) && groupTasks.map((task) => {
-            const days   = task.due ? daysFromToday(task.due) : null;
+            const dt     = mergeTask(task);
+            const days   = dt.due ? daysFromToday(dt.due) : null;
             const over   = days !== null && days < 0;
             const today  = days === 0;
             const isExp  = expandedGid === task.gid;
@@ -633,30 +537,12 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
             return (
               <Fragment key={task.gid}>
-                <tr
-                  className={`task-tr${over ? " task-tr-over" : ""}${isExp ? " task-tr-exp" : ""}${selectedGids.has(task.gid) ? " task-tr-selected" : ""}${draggingGid === task.gid ? " task-tr-dragging" : ""}${dragOverGid === task.gid ? " task-tr-drag-over" : ""}`}
-                  onDragOver={(e) => handleDragOver(e, task.gid)}
-                  onDrop={() => handleDrop(task.gid, displayed)}
-                >
-                  {/* drag handle */}
-                  <td className="td-drag"
-                    draggable
-                    onDragStart={() => handleDragStart(task.gid)}
-                    onDragEnd={handleDragEnd}
-                    title="Drag to reorder"
-                  >
-                    <span className="drag-handle">⠿</span>
-                  </td>
+                <tr className={`task-tr${over ? " task-tr-over" : ""}${isExp ? " task-tr-exp" : ""}`}>
 
-                  {/* select */}
+                  {/* complete */}
                   <td className="td-check">
-                    <input
-                      type="checkbox"
-                      className="row-checkbox"
-                      checked={selectedGids.has(task.gid)}
-                      onChange={() => toggleSelect(task.gid)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                    <button className="task-check" title="Mark complete"
+                      disabled={busyGid === task.gid} onClick={() => completeTask(task.gid)}>✓</button>
                   </td>
 
                   {/* name — single-click to edit, double-click to expand */}
@@ -686,11 +572,11 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                         <span
                           className={`task-name${savingName === task.gid ? " saving" : ""}`}
                           title="Click to edit name · Double-click to expand"
-                          onClick={() => handleNameClick(task.gid, task.name)}
+                          onClick={() => handleNameClick(task.gid, dt.name)}
                           onDoubleClick={() => handleNameDblClick(task.gid)}
                           style={{ cursor: "pointer" }}
                         >
-                          {task.name}
+                          {dt.name}
                         </span>
                       )}
                     </div>
@@ -702,7 +588,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                     {editSubj === task.gid && availableSubjects.length > 0 ? (
                       <select
                         className="input subj-select"
-                        defaultValue={task.subject}
+                        defaultValue={dt.subject}
                         autoFocus
                         onChange={(e) => saveSubject(task.gid, e.target.value)}
                         onBlur={() => setEditSubj(null)}
@@ -713,10 +599,10 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       </select>
                     ) : (
                       <span
-                        className={`pill subj ${subjClass(task.subject)}${availableSubjects.length > 1 ? " subj-clickable" : ""}`}
+                        className={`pill subj ${subjClass(dt.subject)}${availableSubjects.length > 1 ? " subj-clickable" : ""}`}
                         onClick={() => availableSubjects.length > 1 && setEditSubj(task.gid)}
                       >
-                        {task.subject}{task.track && task.track !== "General" ? ` · ${task.track}` : ""}
+                        {dt.subject}{dt.track && dt.track !== "General" ? ` · ${dt.track}` : ""}
                       </span>
                     )}
                   </td>
@@ -727,7 +613,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                     {editStatus === task.gid && task.statusFieldGid ? (
                       <select
                         className="input subj-select"
-                        defaultValue={task.statusOptions.find((o) => o.name === task.status)?.gid ?? ""}
+                        defaultValue={task.statusOptions.find((o) => o.name === dt.status)?.gid ?? ""}
                         autoFocus
                         onChange={(e) => saveStatus(task, e.target.value || null)}
                         onBlur={() => setEditStatus(null)}
@@ -737,25 +623,35 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                           <option key={o.gid} value={o.gid}>{o.name}</option>
                         ))}
                       </select>
-                    ) : task.status ? (
-                      <span
-                        className={`pill status status-${task.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
-                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                      >
-                        {task.status}
-                      </span>
+                    ) : dt.status ? (
+                      <>
+                        <span
+                          className={`pill status status-${dt.status.toLowerCase().replace(/\s+/g, "-")}${task.statusFieldGid ? " subj-clickable" : ""}`}
+                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        >
+                          {dt.status}
+                        </span>
+                        {subtaskInProgress.has(task.gid) && (
+                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳</span>
+                        )}
+                      </>
                     ) : (
-                      <span
-                        className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
-                        onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
-                      >
-                        {task.statusFieldGid ? "Set status" : "—"}
-                      </span>
+                      <>
+                        <span
+                          className={`no-val${task.statusFieldGid ? " subj-clickable" : ""}`}
+                          onClick={() => task.statusFieldGid && setEditStatus(task.gid)}
+                        >
+                          {task.statusFieldGid ? "Set status" : "—"}
+                        </span>
+                        {subtaskInProgress.has(task.gid) && (
+                          <span className="pill status status-in-progress subtask-status-badge" title="A subtask is In Progress">↳ In Progress</span>
+                        )}
+                      </>
                     )}
                   </td>
 
                   {/* project */}
-                  <td className="td-proj" style={{ position: "relative" }}>
+                  <td className="td-proj">
                     {task.projectGid ? (
                       <a
                         href={`https://app.asana.com/0/${task.projectGid}/list`}
@@ -764,43 +660,8 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       >
                         {task.project}
                       </a>
-                    ) : editProject === task.gid ? (
-                      <div className="project-picker">
-                        <input
-                          className="input project-picker-input"
-                          placeholder="Search projects…"
-                          value={projectSearch}
-                          autoFocus
-                          onChange={(e) => searchProjects(e.target.value)}
-                          onBlur={() => setTimeout(() => setEditProject(null), 200)}
-                          onKeyDown={(e) => e.key === "Escape" && setEditProject(null)}
-                        />
-                        {loadingProjects && <div className="project-picker-loading">Loading…</div>}
-                        {!loadingProjects && projectHits.length > 0 && (
-                          <div className="project-picker-hits">
-                            {projectHits
-                              .filter((p) => !projectSearch || p.name.toLowerCase().includes(projectSearch.toLowerCase()))
-                              .slice(0, 8)
-                              .map((p) => (
-                                <button
-                                  key={p.gid}
-                                  className="project-picker-hit"
-                                  onMouseDown={() => pickProject(task.gid, p.gid)}
-                                >
-                                  {p.name}
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
                     ) : (
-                      <button
-                        className="add-project-btn"
-                        title="Add to project"
-                        onClick={() => openProjectPicker(task.gid)}
-                      >
-                        + project
-                      </button>
+                      task.project
                     )}
                   </td>
 
@@ -813,7 +674,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       ) : (
                         <select
                           className="input subj-select"
-                          defaultValue={task.sectionGid ?? ""}
+                          defaultValue={dt.sectionGid ?? ""}
                           autoFocus
                           onChange={(e) => saveSection(task.gid, e.target.value)}
                           onBlur={() => setEditSection(null)}
@@ -828,14 +689,14 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                         className={`section-label${task.projectGid ? " subj-clickable" : ""}`}
                         onClick={() => task.projectGid && startSectionEdit(task)}
                       >
-                        {task.section ?? <span className="no-val">—</span>}
+                        {dt.section ?? <span className="no-val">—</span>}
                       </span>
                     )}
                   </td>
 
                   {/* due — click cell to edit inline */}
                   <td className="td-due" title="Click to edit"
-                    onClick={() => { if (!isDueEdit) setEditDue({ gid: task.gid, value: task.due ?? "" }); }}>
+                    onClick={() => { if (!isDueEdit) setEditDue({ gid: task.gid, value: dt.due ?? "" }); }}>
                     {isDueEdit ? (
                       <input type="date" className="input due-inline-input"
                         value={editDue!.value} autoFocus
@@ -845,7 +706,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                         onClick={(e) => e.stopPropagation()} />
                     ) : (
                       <span className={`due-label${over ? " over" : ""}`}>
-                        {task.due ? fmtDue(task.due) : <span className="no-val">—</span>}
+                        {dt.due ? fmtDue(dt.due) : <span className="no-val">—</span>}
                         {over   && <span className="due-pip danger">{-days!}d</span>}
                         {today  && <span className="due-pip today">Today</span>}
                       </span>
@@ -861,7 +722,7 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
                   {/* description — click to edit inline, or edit in expanded panel */}
                   <td className="td-desc"
-                    onClick={() => { if (!isDescEdit) setEditDesc({ gid: task.gid, value: task.notes }); }}>
+                    onClick={() => { if (!isDescEdit) setEditDesc({ gid: task.gid, value: dt.notes }); }}>
                     {isDescEdit ? (
                       <div onClick={(e) => e.stopPropagation()}>
                         <MentionTextarea
@@ -875,11 +736,11 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                       </div>
                     ) : (
                       <span className={`desc-preview${savingDesc === task.gid ? " saving" : ""}`}>
-                        {task.notes ? (() => {
-                          const words = task.notes.split(/\s+/);
+                        {dt.notes ? (() => {
+                          const words = dt.notes.split(/\s+/);
                           const isExpanded = expandedDesc.has(task.gid);
                           const needsTrunc = words.length > 20;
-                          const shown = isExpanded ? task.notes : words.slice(0, 20).join(" ");
+                          const shown = isExpanded ? dt.notes : words.slice(0, 20).join(" ");
                           return <>
                             {shown}{needsTrunc && !isExpanded && "…"}
                             {needsTrunc && (
@@ -900,13 +761,13 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                 {/* expanded row — description + comments/subtasks side by side */}
                 {isExp && (
                   <tr className="detail-tr">
-                    <td colSpan={10}>
+                    <td colSpan={9}>
                       <div className="detail-panel detail-panel-cols">
                         <div className="detail-desc-col">
                           <div className="expand-section-title">Description</div>
                           <MentionTextarea
-                            defaultValue={task.notes}
-                            onBlur={(plain, html) => { if (plain !== task.notes) saveDesc(task.gid, plain, html); }}
+                            defaultValue={dt.notes}
+                            onBlur={(plain, html) => { if (plain !== dt.notes) saveDesc(task.gid, plain, html); }}
                             placeholder="Add a description… (@name to mention)"
                             rows={10}
                             className="input detail-desc-textarea"
@@ -925,11 +786,11 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                                   style={{ fontSize: 12, padding: "3px 7px", height: "auto" }} />
                                 {editAsgn.hits.length > 0 && (
                                   <div className="hits">
-                                    <button className="hit" onMouseDown={() => pickAssignee(task.gid, null)}>
+                                    <button className="hit" onMouseDown={() => pickAssignee(task.gid, null, null)}>
                                       <span className="host">Unassign</span>
                                     </button>
                                     {editAsgn.hits.map((u) => (
-                                      <button key={u.gid} className="hit" onMouseDown={() => pickAssignee(task.gid, u.gid)}>
+                                      <button key={u.gid} className="hit" onMouseDown={() => pickAssignee(task.gid, u.gid, u.name)}>
                                         <span>{u.name}</span>
                                         {u.email && <span className="host">{u.email}</span>}
                                       </button>
@@ -939,16 +800,34 @@ const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
                               </div>
                             ) : (
                               <span className="asgn-display" title="Click to change"
-                                onClick={() => startAsgnEdit(task.gid, task.assignee)}>
+                                onClick={() => startAsgnEdit(task.gid, dt.assignee ?? null)}>
                                 {savingAsgn === task.gid
                                   ? <span className="no-val">Saving…</span>
-                                  : task.assignee ?? <span className="no-val">—</span>}
+                                  : dt.assignee ?? <span className="no-val">—</span>}
                               </span>
                             )}
                           </div>
+                          {task.createdBy && (
+                            <div className="detail-createdby-row">
+                              <span className="expand-section-title">Created by</span>
+                              <span className="asgn-display">{task.createdBy}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="detail-comments-col">
-                          <CommentsPanel gid={task.gid} />
+                          <CommentsPanel
+                            gid={task.gid}
+                            onSubtasksLoaded={(subtasks: Subtask[]) => {
+                              const hasInProgress = subtasks.some(
+                                (s) => !s.completed && s.status?.toLowerCase().includes("in progress"),
+                              );
+                              setSubtaskInProgress((prev) => {
+                                const next = new Set(prev);
+                                hasInProgress ? next.add(task.gid) : next.delete(task.gid);
+                                return next;
+                              });
+                            }}
+                          />
                         </div>
                       </div>
                     </td>

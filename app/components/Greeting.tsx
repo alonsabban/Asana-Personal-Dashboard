@@ -2,34 +2,33 @@
 
 import { useEffect, useState } from "react";
 
-const TIME_SLOTS = [
-  { maxHour:  5, label: "Good night",      emoji: "🌙" },
-  { maxHour: 12, label: "Good morning",    emoji: "🌅" },
-  { maxHour: 14, label: "Good noon",       emoji: "☀️" },
-  { maxHour: 18, label: "Good afternoon",  emoji: "🌇" },
-  { maxHour: 21, label: "Good evening",    emoji: "🌆" },
-  { maxHour: 24, label: "Good night",      emoji: "🌙" },
-];
-
-function getSlot(h: number) {
-  return TIME_SLOTS.find((s) => h < s.maxHour) ?? TIME_SLOTS[TIME_SLOTS.length - 1];
-}
-
-/**
- * Time-of-day greeting. `name` comes from the connected Asana account; until it
- * resolves we greet without one rather than guessing.
- */
 export default function Greeting({ name }: { name?: string | null }) {
-  const [slot, setSlot] = useState(TIME_SLOTS[1]);
+  const [part, setPart] = useState("Hello");
 
   useEffect(() => {
-    setSlot(getSlot(new Date().getHours()));
+    const timerRef = { current: 0 as ReturnType<typeof setTimeout> };
+
+    function schedule() {
+      const now = new Date();
+      const h = now.getHours();
+      setPart(h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
+
+      // fire again exactly at the next phase boundary (midnight, noon, 6 pm)
+      const next = new Date(now);
+      if (h < 12)      next.setHours(12, 0, 0, 0);
+      else if (h < 18) next.setHours(18, 0, 0, 0);
+      else             { next.setDate(next.getDate() + 1); next.setHours(0, 0, 0, 0); }
+
+      timerRef.current = setTimeout(schedule, next.getTime() - now.getTime());
+    }
+
+    schedule();
+    return () => clearTimeout(timerRef.current);
   }, []);
 
   return (
-    <h1 suppressHydrationWarning style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
-      {name ? `${slot.label}, ${name}` : slot.label}
-      <span className="greeting-emoji" aria-hidden>{slot.emoji}</span>
+    <h1 suppressHydrationWarning>
+      {name ? `${part}, ${name}` : part}
     </h1>
   );
 }
