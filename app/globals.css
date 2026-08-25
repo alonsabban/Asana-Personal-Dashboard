@@ -73,6 +73,49 @@ button {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 28px;
+  border-radius: 14px;
+  padding: 18px 24px 28px;
+  position: relative;
+  transition: background 2s ease;
+}
+
+/* Day-phase gradient backgrounds — gentle, semi-transparent */
+.topbar[data-phase="lateNight"] {
+  background: linear-gradient(135deg,
+    rgba(10, 15, 46, 0.18) 0%,
+    rgba(30, 20, 60, 0.12) 100%
+  );
+}
+.topbar[data-phase="morning"] {
+  background: linear-gradient(125deg,
+    rgba(244, 248, 3, 0.486) 0%,
+    rgba(255, 210, 120, 0.09) 45%,
+    rgba(61, 170, 233, 0.07) 100%
+  );
+}
+.topbar[data-phase="noon"] {
+  background: linear-gradient(180deg,
+    rgba(255, 233, 110, 0.836) 0%,
+    rgba(233, 162, 8, 0.07) 100%
+  );
+}
+.topbar[data-phase="afternoon"] {
+  background: linear-gradient(120deg,
+    rgba(250, 246, 3, 0.13) 0%,
+    rgba(220, 110, 65, 0.08) 100%
+  );
+}
+.topbar[data-phase="evening"] {
+  background: linear-gradient(135deg,
+    rgba(220, 105, 80, 0.14) 0%,
+    rgba(56, 59, 209, 0.1) 100%
+  );
+}
+.topbar[data-phase="night"] {
+  background: linear-gradient(135deg,
+    rgba(45, 53, 97, 0.17) 0%,
+    rgba(3, 4, 12, 0.507) 100%
+  );
 }
 
 .greeting h1 {
@@ -1573,25 +1616,26 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  background: var(--accent-dim);
+  background: transparent;
   border: none;
   cursor: pointer;
   padding: 5px 14px;
   border-radius: 20px;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.15s;
   letter-spacing: 0.01em;
 }
-.topbar-text-btn:hover { background: var(--accent); color: #fff; }
+.topbar-text-btn:hover { color: var(--text); }
 
 .topbar-version {
-  font-size: 11px;
-  font-weight: 600;
+  position: absolute;
+  bottom: 8px;
+  right: 16px;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--text-faint);
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  opacity: 0.6;
 }
 
 /* ── Feedback popover ── */
@@ -1908,14 +1952,3 @@ button {
   white-space: nowrap;
 }
 
-/* Greeting time-of-day emoji */
-.greeting-emoji {
-  font-size: 1em;
-  display: inline-block;
-  animation: greeting-float 3s ease-in-out infinite;
-}
-
-@keyframes greeting-float {
-  0%, 100% { transform: translateY(0);    }
-  50%       { transform: translateY(-4px); }
-}

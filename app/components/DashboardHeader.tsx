@@ -7,6 +7,7 @@ import Greeting from "@/app/components/Greeting";
 import Tutorial from "@/app/components/Tutorial";
 import Feedback from "@/app/components/Feedback";
 import VoiceSetupModal from "@/app/components/VoiceSetupModal";
+import { useDayPhase } from "@/app/hooks/useDayPhase";
 import { APP_VERSION } from "@/app/version";
 
 /**
@@ -16,13 +17,14 @@ import { APP_VERSION } from "@/app/version";
 export default function DashboardHeader() {
   const { data } = useAsana();
   const [showVoiceSetup, setShowVoiceSetup] = useState(false);
+  const phase = useDayPhase();
 
   const firstName = data?.user.name?.trim().split(/\s+/)[0] ?? null;
   const projectCount = data?.byProject.length ?? 0;
 
   return (
     <>
-    <header className="topbar" id="tutorial-topbar">
+    <header className="topbar" id="tutorial-topbar" data-phase={phase}>
       <div className="greeting">
         <Greeting name={firstName} />
         {data ? (
@@ -40,10 +42,10 @@ export default function DashboardHeader() {
           <Tutorial />
           <button className="topbar-text-btn" onClick={() => setShowVoiceSetup(true)} title="Voice task setup">🎤 Voice</button>
           <a href="/docs.html" target="_blank" rel="noopener noreferrer" className="topbar-text-btn" title="Architecture docs">Docs</a>
-          <span className="topbar-version">V{APP_VERSION}</span>
         </div>
         <Clock />
       </div>
+      <span className="topbar-version">V{APP_VERSION}</span>
     </header>
     {showVoiceSetup && <VoiceSetupModal onClose={() => setShowVoiceSetup(false)} />}
     </>

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Auto-increment APP_VERSION in app/version.ts on every commit
+
+VERSION_FILE="app/version.ts"
+
+# Extract current version number
+CURRENT=$(grep -oE '[0-9]+\.[0-9]+' "$VERSION_FILE" | head -1)
+if [ -z "$CURRENT" ]; then
+  echo "[pre-commit] Could not read version from $VERSION_FILE — skipping bump"
+  exit 0
+fi
+
+MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+MINOR=$(echo "$CURRENT" | cut -d. -f2)
+NEW_MINOR=$((MINOR + 1))
+NEW_VERSION="$MAJOR.$NEW_MINOR"
+
+# Write new version
+echo "export const APP_VERSION = \"$NEW_VERSION\";" > "$VERSION_FILE"
+
+git add "$VERSION_FILE"
+echo "[pre-commit] Version bumped $CURRENT → $NEW_VERSION"
