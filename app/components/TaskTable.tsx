@@ -139,6 +139,11 @@ export default function TaskTable({
   const [sectionOptions, setSectionOptions] = useState<{ gid: string; name: string }[]>([]);
   const [loadingSections, setLoadingSections] = useState(false);
 
+  /* project inline edit (tasks with no project) */
+  const [editProj, setEditProj] = useState<string | null>(null);
+  const [projOptions, setProjOptions] = useState<{ gid: string; name: string }[]>([]);
+  const [loadingProjs, setLoadingProjs] = useState(false);
+
   /* subject inline edit */
   const [editSubj, setEditSubj] = useState<string | null>(null);
 
@@ -479,6 +484,35 @@ export default function TaskTable({
     } finally { dropPending(task.gid); }
   }
 
+  async function startProjEdit(task: AsanaTask) {
+    setEditProj(task.gid);
+    setProjOptions([]);
+    setLoadingProjs(true);
+    try {
+      const r = await fetch("/api/asana/projects", { cache: "no-store" });
+      const j = await r.json();
+      setProjOptions(j.projects ?? []);
+    } finally {
+      setLoadingProjs(false);
+    }
+  }
+
+  async function saveProject(taskGid: string, projectGid: string) {
+    setEditProj(null);
+    const name = projOptions.find((p) => p.gid === projectGid)?.name ?? "";
+    applyPending(taskGid, { project: name, projectGid });
+    try {
+      const r = await fetch(`/api/asana/task/${taskGid}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectGid }),
+      });
+      if (!r.ok) throw new Error();
+      await onChanged();
+    } catch {
+      showError("Failed to assign project");
+    } finally { dropPending(taskGid); }
+  }
+
   async function startSectionEdit(task: AsanaTask) {
     if (!task.projectGid) return;
     setEditSection(task.gid);
@@ -728,8 +762,27 @@ export default function TaskTable({
                       >
                         {task.project}
                       </a>
+                    ) : editProj === task.gid ? (
+                      loadingProjs ? (
+                        <span className="no-val">Loading…</span>
+                      ) : (
+                        <select
+                          className="input subj-select"
+                          defaultValue=""
+                          autoFocus
+                          onChange={(e) => e.target.value && saveProject(task.gid, e.target.value)}
+                          onBlur={() => setEditProj(null)}
+                        >
+                          <option value="" disabled>Select project…</option>
+                          {projOptions.map((p) => (
+                            <option key={p.gid} value={p.gid}>{p.name}</option>
+                          ))}
+                        </select>
+                      )
                     ) : (
-                      task.project
+                      <span className="no-val subj-clickable" title="Click to assign project" onClick={() => startProjEdit(task)}>
+                        Set project
+                      </span>
                     )}
                   </td>
 
