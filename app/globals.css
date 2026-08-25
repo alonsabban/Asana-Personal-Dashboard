@@ -744,15 +744,14 @@ button {
   opacity: 0.5;
 }
 .caret {
-  color: var(--text-faint);
-  font-size: 10px;
+  color: var(--accent);
+  font-size: 14px;
   transition: transform 0.12s;
   flex-shrink: 0;
   transform: translateY(-1px);
 }
 .caret.open {
   transform: translateY(-1px) rotate(90deg);
-  color: var(--accent);
 }
 
 .editor-head {
