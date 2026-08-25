@@ -745,7 +745,7 @@ button {
 }
 .caret {
   color: var(--accent);
-  font-size: 14px;
+  font-size: 17px;
   transition: transform 0.12s;
   flex-shrink: 0;
   transform: translateY(-1px);
@@ -1264,7 +1264,7 @@ button {
 .group-caret {
   display: inline-block;
   margin-right: 8px;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--accent);
   transition: transform 0.15s;
 }
