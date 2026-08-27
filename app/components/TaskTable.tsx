@@ -619,7 +619,33 @@ export default function TaskTable({
                   </tr>
                 );
               })()}
-              {!collapsedGroups.has(label) && groupTasks.map((task) => {
+              {!collapsedGroups.has(label) && (() => {
+                type RItem =
+                  | { type: "section"; lbl: string; cnt: number }
+                  | { type: "task"; task: AsanaTask };
+                const items: RItem[] = groupBy === "project" ? (() => {
+                  const order: string[] = [];
+                  const smap = new Map<string, AsanaTask[]>();
+                  for (const t of groupTasks) {
+                    const k = t.section ?? "(No section)";
+                    if (!smap.has(k)) { order.push(k); smap.set(k, []); }
+                    smap.get(k)!.push(t);
+                  }
+                  return order.flatMap((sec) => [
+                    { type: "section" as const, lbl: sec, cnt: smap.get(sec)!.length },
+                    ...smap.get(sec)!.map((t) => ({ type: "task" as const, task: t })),
+                  ]);
+                })() : groupTasks.map((t) => ({ type: "task" as const, task: t }));
+                return items.map((item) => {
+                  if (item.type === "section") return (
+                    <tr key={`__sec__${item.lbl}`} className="section-subheader-tr">
+                      <td colSpan={9}>
+                        <span className="section-subheader-label">{item.lbl}</span>
+                        <span className="group-count">{item.cnt} task{item.cnt !== 1 ? "s" : ""}</span>
+                      </td>
+                    </tr>
+                  );
+                  const task = item.task;
             const dt     = mergeTask(task);
             const days   = dt.due ? daysFromToday(dt.due) : null;
             const over   = days !== null && days < 0;
@@ -956,7 +982,8 @@ export default function TaskTable({
                 )}
               </Fragment>
             );
-          })}
+                });
+              })()}
             </Fragment>
           ))}
 
