@@ -85,6 +85,15 @@ export async function clearClassificationCache(): Promise<void> {
   }
 }
 
+/** Remove only "Other" entries from the cache so those tasks are retried on the next classify run. */
+export async function clearOtherClassifications(): Promise<void> {
+  await mutateCache((cache) => {
+    for (const gid of Object.keys(cache)) {
+      if (cache[gid] === "Other") delete cache[gid];
+    }
+  });
+}
+
 export type TaskInput = {
   gid: string;
   name: string;

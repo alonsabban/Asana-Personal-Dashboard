@@ -3,13 +3,23 @@
 import { useState } from "react";
 import { useAsana } from "@/app/components/AsanaProvider";
 import TaskTable from "@/app/components/TaskTable";
+import OtherSubjectsModal from "@/app/components/OtherSubjectsModal";
 import { taskMatches } from "@/app/lib/match";
 import type { AsanaTask } from "@/app/lib/asana";
 
 type View = "open" | "overdue" | "thisweek" | "nodate" | null;
 
 export default function AsanaModule() {
-  const { data, error, loading, refresh, query } = useAsana();
+  const {
+    data,
+    error,
+    loading,
+    refresh,
+    silentRefresh,
+    query,
+    othersAfterRefresh,
+    dismissOthers,
+  } = useAsana();
   const [activeView, setActiveView] = useState<View>(null);
 
   const searching = query.trim().length > 0;
@@ -103,7 +113,7 @@ export default function AsanaModule() {
                   {searching ? "No tasks match your search." : "Nothing here."}
                 </div>
               ) : (
-                <TaskTable tasks={list} onChanged={refresh} />
+                <TaskTable tasks={list} onChanged={silentRefresh} />
               )}
             </div>
           )}
@@ -135,6 +145,15 @@ export default function AsanaModule() {
             })}
           </div>
         </section>
+      )}
+
+      {othersAfterRefresh && data && (
+        <OtherSubjectsModal
+          tasks={othersAfterRefresh}
+          availableSubjects={data.availableSubjects}
+          onSave={silentRefresh}
+          onClose={dismissOthers}
+        />
       )}
     </div>
   );

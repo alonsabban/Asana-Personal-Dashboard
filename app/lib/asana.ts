@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getSubjectDefs } from "@/app/lib/subjects";
-import { classifyTasks, hasAICredentials } from "@/app/lib/classify";
+import { classifyTasks, hasAICredentials, clearOtherClassifications } from "@/app/lib/classify";
 import { getSettings } from "@/app/lib/settings";
 
 const ASANA_API = "https://app.asana.com/api/1.0";
@@ -402,6 +402,10 @@ export async function getAsanaData(): Promise<AsanaData> {
   // Phase 2: classify — AI when AWS Bedrock credentials are set, keyword rules otherwise
   const subjectDefs = await getSubjectDefs();
   const useAI = await hasAICredentials();
+  // Give "Other" tasks another shot on every refresh — clear their cache entries
+  // so they go back through project-match and AI classification.
+  // Skip when no subjects are configured: every task would just land in "Other" again.
+  if (useAI && subjectDefs.length > 0) await clearOtherClassifications();
   const aiClassifications = useAI
     ? await classifyTasks(
         rawTasks.map((t) => ({
