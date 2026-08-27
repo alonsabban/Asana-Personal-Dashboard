@@ -1282,9 +1282,16 @@ button {
   margin-left: 8px;
 }
 .section-subheader-tr td {
-  padding: 6px 8px 4px 28px;
+  padding: 5px 8px 3px 28px;
   background: transparent;
   border-bottom: 1px solid var(--border);
+}
+.section-subheader-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.section-subheader-clickable:hover td {
+  background: var(--bg-hover);
 }
 .section-subheader-label {
   font-size: 11px;
@@ -1292,6 +1299,16 @@ button {
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+.section-caret {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  transition: transform 0.15s;
+}
+.section-caret.open {
+  transform: rotate(90deg);
 }
 .task-table {
   width: 100%;

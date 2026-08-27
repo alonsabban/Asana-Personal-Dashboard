@@ -98,6 +98,7 @@ export default function TaskTable({
   const [expandedGid, setExp]   = useState<string | null>(null);
   const [subtaskInProgress, setSubtaskInProgress] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const seededGroupBy = useRef<string>("none");
 
   /* persist filter state */
@@ -352,12 +353,23 @@ export default function TaskTable({
     seededGroupBy.current = "none";
     setCollapsedGroups(new Set());
   }
+  if (groupBy !== "project" && expandedSections.size > 0) setExpandedSections(new Set());
 
   function toggleGroup(label: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
       else next.add(label);
+      return next;
+    });
+  }
+
+  function toggleSection(projectLabel: string, sectionLabel: string) {
+    const key = `${projectLabel}::${sectionLabel}`;
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -622,7 +634,7 @@ export default function TaskTable({
               {!collapsedGroups.has(label) && (() => {
                 type RItem =
                   | { type: "section"; lbl: string; cnt: number }
-                  | { type: "task"; task: AsanaTask };
+                  | { type: "task"; task: AsanaTask; sectionLbl: string };
                 const items: RItem[] = groupBy === "project" ? (() => {
                   const order: string[] = [];
                   const smap = new Map<string, AsanaTask[]>();
@@ -633,18 +645,25 @@ export default function TaskTable({
                   }
                   return order.flatMap((sec) => [
                     { type: "section" as const, lbl: sec, cnt: smap.get(sec)!.length },
-                    ...smap.get(sec)!.map((t) => ({ type: "task" as const, task: t })),
+                    ...smap.get(sec)!.map((t) => ({ type: "task" as const, task: t, sectionLbl: sec })),
                   ]);
-                })() : groupTasks.map((t) => ({ type: "task" as const, task: t }));
+                })() : groupTasks.map((t) => ({ type: "task" as const, task: t, sectionLbl: "" }));
                 return items.map((item) => {
-                  if (item.type === "section") return (
-                    <tr key={`__sec__${item.lbl}`} className="section-subheader-tr">
-                      <td colSpan={9}>
-                        <span className="section-subheader-label">{item.lbl}</span>
-                        <span className="group-count">{item.cnt} task{item.cnt !== 1 ? "s" : ""}</span>
-                      </td>
-                    </tr>
-                  );
+                  if (item.type === "section") {
+                    const secKey = `${label}::${item.lbl}`;
+                    const secOpen = expandedSections.has(secKey);
+                    return (
+                      <tr key={`__sec__${item.lbl}`} className="section-subheader-tr section-subheader-clickable"
+                          onClick={() => toggleSection(label, item.lbl)}>
+                        <td colSpan={9}>
+                          <span className={`section-caret${secOpen ? " open" : ""}`}>▸</span>
+                          <span className="section-subheader-label">{item.lbl}</span>
+                          <span className="group-count">{item.cnt} task{item.cnt !== 1 ? "s" : ""}</span>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (item.sectionLbl && !expandedSections.has(`${label}::${item.sectionLbl}`)) return null;
                   const task = item.task;
             const dt     = mergeTask(task);
             const days   = dt.due ? daysFromToday(dt.due) : null;
