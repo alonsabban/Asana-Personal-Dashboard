@@ -2,28 +2,35 @@
 
 import { useState } from "react";
 
-const FEEDBACK_TO = "asabban@paloaltonetworks.com";
+const FEEDBACK_TO     = "asabban@paloaltonetworks.com";
+const SUBJECT_SUFFIX  = " - Feedback for the Personal Asana Dashboard";
+const FEEDBACK_TYPES  = ["Bug", "Enhancement", "Something is not clear"] as const;
 
 export default function Feedback() {
-  const [open, setOpen]       = useState(false);
-  const [subject, setSubject] = useState("");
-  const [body, setBody]       = useState("");
+  const [open, setOpen]         = useState(false);
+  const [feedbackType, setType] = useState<typeof FEEDBACK_TYPES[number]>("Bug");
+  const [subject, setSubject]   = useState("");
+  const [body, setBody]         = useState("");
 
   function close() {
     setOpen(false);
+    setType("Bug");
     setSubject("");
     setBody("");
   }
 
   function send() {
-    const s = encodeURIComponent(subject.trim() || "Dashboard Feedback");
-    const b = encodeURIComponent(body.trim());
+    const base = subject.trim() || "Dashboard Feedback";
+    const full = encodeURIComponent(`[${feedbackType}] ${base}${SUBJECT_SUFFIX}`);
+    const b    = encodeURIComponent(body.trim());
     window.open(
-      `https://mail.google.com/mail/?view=cm&to=${FEEDBACK_TO}&su=${s}&body=${b}`,
+      `https://mail.google.com/mail/?view=cm&to=${FEEDBACK_TO}&su=${full}&body=${b}`,
       "_blank",
     );
     close();
   }
+
+  const labelStyle = { fontSize: 12, fontWeight: 600, color: "var(--text-faint)" } as const;
 
   return (
     <>
@@ -45,12 +52,26 @@ export default function Feedback() {
 
             <div className="modal-body">
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-faint)" }}>
+                <label style={labelStyle}>Feedback type</label>
+                <select
+                  className="input"
+                  value={feedbackType}
+                  onChange={(e) => setType(e.target.value as typeof FEEDBACK_TYPES[number])}
+                  style={{ fontSize: 13 }}
+                >
+                  {FEEDBACK_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={labelStyle}>
                   Subject <span style={{ fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   className="input"
-                  placeholder="e.g. Bug report, Feature request…"
+                  placeholder="Brief description…"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   onKeyDown={(e) => e.key === "Escape" && close()}
@@ -59,9 +80,7 @@ export default function Feedback() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-faint)" }}>
-                  Message
-                </label>
+                <label style={labelStyle}>Message</label>
                 <textarea
                   className="input"
                   placeholder="Describe the issue or idea…"
