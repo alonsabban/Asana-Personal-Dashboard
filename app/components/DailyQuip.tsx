@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDayPhase } from "@/app/hooks/useDayPhase";
 
 const QUIPS: Record<string, string[]> = {
   lateNight: [
@@ -77,22 +78,14 @@ const QUIPS: Record<string, string[]> = {
   ],
 };
 
-function getBucket(h: number): string {
-  if (h < 5)  return "lateNight";
-  if (h < 12) return "morning";
-  if (h < 14) return "noon";
-  if (h < 18) return "afternoon";
-  if (h < 21) return "evening";
-  return "night";
-}
-
 export default function DailyQuip() {
+  const phase = useDayPhase();
   const [quip, setQuip] = useState("");
 
   useEffect(() => {
-    const bucket = QUIPS[getBucket(new Date().getHours())];
+    const bucket = QUIPS[phase];
     setQuip(bucket[Math.floor(Math.random() * bucket.length)]);
-  }, []);
+  }, [phase]);
 
   if (!quip) return null;
 
