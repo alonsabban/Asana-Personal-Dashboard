@@ -364,6 +364,80 @@ export async function classifyTasks(
   return result;
 }
 
+export type AccomplishmentTask = {
+  name: string;
+  project: string;
+  subject: string | null;
+  completedAt: string | null;
+  status: string | null;
+};
+
+/**
+ * Generate an executive accomplishments summary for a list of recently completed tasks.
+ * Uses the same Bedrock invocation pattern as callBedrock().
+ */
+export async function generateAccomplishmentsSummary(
+  tasks: AccomplishmentTask[],
+  aws: ResolvedAws,
+): Promise<{ summary: string; success: boolean }> {
+  try {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
+    const client = new BedrockRuntimeClient({
+      region: aws.region,
+      credentials: {
+        accessKeyId: aws.accessKeyId,
+        secretAccessKey: aws.secretAccessKey,
+      },
+    });
+
+    const systemPrompt =
+      "You are an executive assistant helping a professional write a brief status report for their manager. " +
+      "Write in first person. Be concise, specific, and professional. " +
+      "Organize the summary into 2-3 focused paragraphs, grouping related work naturally by theme or project area. " +
+      "Do not list every task individually — synthesize them into meaningful accomplishments. " +
+      "For tasks that are completed, use past tense. For tasks marked as in-progress, use present tense (e.g. 'I am currently working on...').";
+
+    const userContent =
+      `Here are my recent tasks. Please write a 2-3 paragraph executive summary. ` +
+      `Include completed work (past tense) and highlight work that is in progress (present tense):\n\n` +
+      JSON.stringify(
+        tasks.map((t) => ({
+          task: t.name,
+          area: t.subject ?? t.project,
+          state: t.completedAt ? "completed" : "in progress",
+          completedOn: t.completedAt ? t.completedAt.slice(0, 10) : null,
+        })),
+        null,
+        2,
+      );
+
+    const payload = {
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }],
+    };
+
+    const raw = await client.send(
+      new InvokeModelCommand({
+        modelId: aws.modelId,
+        contentType: "application/json",
+        accept: "application/json",
+        body: JSON.stringify(payload),
+      }),
+    );
+
+    const body = JSON.parse(new TextDecoder().decode(raw.body)) as {
+      content: { type: string; text: string }[];
+    };
+    const summary = body.content.find((b) => b.type === "text")?.text ?? "";
+    return { summary, success: true };
+  } catch (err) {
+    console.error("[classify] generateAccomplishmentsSummary failed:", err);
+    return { summary: "", success: false };
+  }
+}
+
 /** Single batched call to Claude via AWS Bedrock. */
 async function callBedrock(
   tasks: TaskInput[],
