@@ -399,14 +399,13 @@ export async function generateAccomplishmentsSummary(
       "You are an executive assistant helping a professional write a structured status report for their manager. " +
       "Write in first person, professionally and concisely. " +
       "You will receive a list of work areas (subjects) and a list of tasks. " +
-      "Write exactly one short paragraph per subject, in the order given. " +
-      "Each paragraph must cover three aspects in this order: " +
-      "(1) Completed / Done — what was finished (past tense), " +
-      "(2) In Progress / Started — what is actively underway (present tense), " +
-      "(3) Scheduled / Planned — what is queued up next (future tense). " +
-      "If a subject has no tasks at all for the period, write one sentence saying no activity was recorded. " +
-      "Do not skip any subject. Do not add headers or bullet points — flowing prose only. " +
-      "Synthesize tasks into accomplishments; do not just list task names verbatim.";
+      "For each subject, output its name on its own line, then 2-5 bullet points (each starting with '• '). " +
+      "Separate subjects with a blank line. " +
+      "Each bullet should be one concise sentence covering one accomplishment or activity. " +
+      "Within each subject, order bullets: completed items first (past tense), then in-progress (present tense), then planned/scheduled (future tense). " +
+      "If a subject has no tasks, write a single bullet: '• No activity recorded this period.' " +
+      "Do not skip any subject. Do not write introductory or closing sentences. Output only the subject blocks. " +
+      "Synthesize tasks into accomplishments; do not copy task names verbatim.";
 
     const userContent =
       `Work areas to cover (write one paragraph each, in this order):\n` +
