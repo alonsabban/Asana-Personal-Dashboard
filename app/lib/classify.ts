@@ -368,6 +368,8 @@ export type AccomplishmentTask = {
   name: string;
   project: string;
   subject: string | null;
+  notes: string | null;
+  subtasks: { name: string; completed: boolean }[];
   completedAt: string | null;
   status: string | null;
 };
@@ -406,6 +408,10 @@ export async function generateAccomplishmentsSummary(
           area: t.subject ?? t.project,
           state: t.completedAt ? "completed" : "in progress",
           completedOn: t.completedAt ? t.completedAt.slice(0, 10) : null,
+          ...(t.notes ? { description: t.notes } : {}),
+          ...(t.subtasks.length > 0
+            ? { subtasks: t.subtasks.map((s) => `${s.completed ? "[done]" : "[open]"} ${s.name}`) }
+            : {}),
         })),
         null,
         2,

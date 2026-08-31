@@ -7,6 +7,8 @@ type RawTask = {
   name: string;
   project: string;
   subject: string | null;
+  notes: string | null;
+  subtasks: { name: string; completed: boolean }[];
   completedAt: string | null;
   completed: boolean;
   status: string | null;
@@ -94,6 +96,8 @@ export default function AccomplishmentsReport() {
             name: t.name,
             project: t.project,
             subject: t.subject,
+            notes: t.notes,
+            subtasks: t.subtasks,
             completedAt: t.completedAt,
             status: t.status,
           })),

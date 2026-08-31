@@ -11,10 +11,12 @@ const MAX_REPORT_TASKS = 500;
 type RawReportTask = {
   gid: string;
   name: string;
+  notes?: string;
   completed: boolean;
   completed_at?: string | null;
   due_on?: string | null;
   projects?: { gid: string; name: string }[];
+  subtasks?: { name: string; completed: boolean }[];
   custom_fields?: {
     gid: string;
     name: string;
@@ -29,7 +31,8 @@ async function fetchRecentTasks(
   since: string,
 ): Promise<RawReportTask[]> {
   const fields =
-    "name,completed,completed_at,due_on,projects.gid,projects.name," +
+    "name,notes,completed,completed_at,due_on,projects.gid,projects.name," +
+    "subtasks.name,subtasks.completed," +
     "custom_fields.gid,custom_fields.name,custom_fields.type,custom_fields.enum_value.name";
 
   const basePath =
@@ -123,6 +126,8 @@ export async function GET(request: Request) {
         name: t.name,
         project: primaryProject(t),
         subject,
+        notes: t.notes?.trim().slice(0, 400) || null,
+        subtasks: (t.subtasks ?? []).map((s) => ({ name: s.name, completed: s.completed })),
         completedAt: t.completed_at ?? null,
         completed: t.completed,
         status,
