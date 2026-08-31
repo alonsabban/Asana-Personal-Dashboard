@@ -137,10 +137,24 @@ export default function AccomplishmentsReport() {
   }
 
   async function copyAll() {
-    const taskLines = filteredTasks()
-      .map((t) => `• ${t.name} [${t.project}]${t.completedAt ? ` — completed ${t.completedAt.slice(0, 10)}` : t.status ? ` — ${t.status}` : ""}`)
-      .join("\n");
-    const full = `${summary}\n\n---\nTask list:\n${taskLines}`;
+    const all = filteredTasks();
+    const groupOrder = subjects.length > 0 ? subjects : [];
+    const grouped: Record<string, RawTask[]> = {};
+    for (const t of all) {
+      const key = t.subject ?? t.project;
+      (grouped[key] ??= []).push(t);
+    }
+    const orderedKeys = [
+      ...groupOrder.filter((s) => grouped[s]),
+      ...Object.keys(grouped).filter((k) => !groupOrder.includes(k)).sort(),
+    ];
+    const taskSection = orderedKeys.map((group) =>
+      `${group}\n` +
+      grouped[group].map((t) =>
+        `  • ${t.name}${t.completedAt ? ` — completed ${t.completedAt.slice(0, 10)}` : t.status ? ` — ${t.status}` : ""}`
+      ).join("\n")
+    ).join("\n\n");
+    const full = `${summary}\n\n---\nTask list:\n${taskSection}`;
     try {
       await navigator.clipboard.writeText(full);
       setCopied(true);
@@ -306,31 +320,59 @@ export default function AccomplishmentsReport() {
 
                   <div className="settings-section">
                     <h4 className="settings-section-title">Task list ({matchCount})</h4>
-                    <div style={{ maxHeight: 200, overflowY: "auto", fontSize: 13 }}>
-                      {filteredTasks().map((t) => (
-                        <div
-                          key={t.gid}
-                          style={{
-                            padding: "5px 0",
-                            borderBottom: "1px solid var(--border)",
-                            display: "grid",
-                            gridTemplateColumns: "1fr auto auto",
-                            gap: 8,
-                          }}
-                        >
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {t.name}
-                          </span>
-                          <span style={{ color: "var(--text-faint)", fontSize: 12, whiteSpace: "nowrap" }}>
-                            {t.project}
-                          </span>
-                          <span style={{ color: "var(--text-faint)", fontSize: 12, whiteSpace: "nowrap" }}>
-                            {t.completed && t.completedAt
-                              ? t.completedAt.slice(0, 10)
-                              : t.status ?? ""}
-                          </span>
-                        </div>
-                      ))}
+                    <div style={{ maxHeight: 260, overflowY: "auto", fontSize: 13 }}>
+                      {(() => {
+                        const all = filteredTasks();
+                        // Build ordered groups: configured subjects first, then any leftover by project
+                        const groupOrder = subjects.length > 0 ? subjects : [];
+                        const grouped: Record<string, RawTask[]> = {};
+                        for (const t of all) {
+                          const key = t.subject ?? t.project;
+                          (grouped[key] ??= []).push(t);
+                        }
+                        // Keys in subject order, then remainder alphabetically
+                        const orderedKeys = [
+                          ...groupOrder.filter((s) => grouped[s]),
+                          ...Object.keys(grouped).filter((k) => !groupOrder.includes(k)).sort(),
+                        ];
+                        return orderedKeys.map((group) => (
+                          <div key={group} style={{ marginBottom: 8 }}>
+                            <div style={{
+                              fontWeight: 600,
+                              fontSize: 11,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              color: "var(--text-faint)",
+                              padding: "6px 0 3px",
+                              borderBottom: "1px solid var(--border)",
+                              marginBottom: 2,
+                            }}>
+                              {group}
+                            </div>
+                            {grouped[group].map((t) => (
+                              <div
+                                key={t.gid}
+                                style={{
+                                  padding: "4px 0 4px 8px",
+                                  borderBottom: "1px solid var(--border)",
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr auto",
+                                  gap: 8,
+                                }}
+                              >
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {t.name}
+                                </span>
+                                <span style={{ color: "var(--text-faint)", fontSize: 12, whiteSpace: "nowrap" }}>
+                                  {t.completed && t.completedAt
+                                    ? t.completedAt.slice(0, 10)
+                                    : t.status ?? ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()}
                     </div>
                   </div>
                 </>
