@@ -22,6 +22,7 @@ export default function AccomplishmentsReport() {
   const [days, setDays] = useState(14);
   const [tasks, setTasks] = useState<RawTask[]>([]);
   const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
   const [includeCompleted, setIncludeCompleted] = useState(true);
   const [summary, setSummary] = useState("");
@@ -32,6 +33,7 @@ export default function AccomplishmentsReport() {
     setStep("config");
     setTasks([]);
     setStatusOptions([]);
+    setSubjects([]);
     setSelectedStatuses(new Set());
     setIncludeCompleted(true);
     setSummary("");
@@ -52,6 +54,7 @@ export default function AccomplishmentsReport() {
       const json = (await res.json()) as {
         tasks?: RawTask[];
         statusOptions?: string[];
+        subjects?: string[];
         error?: string;
       };
       if (!res.ok || json.error) {
@@ -63,6 +66,7 @@ export default function AccomplishmentsReport() {
       const opts = json.statusOptions ?? [];
       setTasks(fetched);
       setStatusOptions(opts);
+      setSubjects(json.subjects ?? []);
       setSelectedStatuses(new Set(opts));
       setStep("filter");
     } catch {
@@ -92,6 +96,7 @@ export default function AccomplishmentsReport() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          subjects,
           tasks: selected.map((t) => ({
             name: t.name,
             project: t.project,

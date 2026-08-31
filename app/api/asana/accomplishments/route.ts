@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSettings } from "@/app/lib/settings";
 import { getAwsConfig, generateAccomplishmentsSummary, AccomplishmentTask, loadCache } from "@/app/lib/classify";
+import { getSubjectDefs } from "@/app/lib/subjects";
 
 export const dynamic = "force-dynamic";
 
@@ -109,9 +110,10 @@ export async function GET(request: Request) {
     }
 
     const since = new Date(Date.now() - days * 86_400_000).toISOString();
-    const [raw, classCache] = await Promise.all([
+    const [raw, classCache, subjectDefs] = await Promise.all([
       fetchRecentTasks(workspaceGid, token, since),
       loadCache(),
+      getSubjectDefs(),
     ]);
 
     // Build simplified tasks and collect all unique status values
@@ -134,7 +136,8 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ tasks, statusOptions: [...statusOptions] });
+    const subjects = subjectDefs.map((s) => s.name);
+    return NextResponse.json({ tasks, statusOptions: [...statusOptions], subjects });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -144,7 +147,7 @@ export async function GET(request: Request) {
 // POST /api/asana/accomplishments — generate AI summary
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { tasks: AccomplishmentTask[] };
+    const body = (await request.json()) as { tasks: AccomplishmentTask[]; subjects: string[] };
     if (!body.tasks?.length) {
       return NextResponse.json({ error: "No tasks provided." }, { status: 400 });
     }
@@ -154,7 +157,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "no_aws" }, { status: 428 });
     }
 
-    const { summary, success } = await generateAccomplishmentsSummary(body.tasks, aws);
+    const { summary, success } = await generateAccomplishmentsSummary(body.tasks, body.subjects ?? [], aws);
     if (!success) {
       return NextResponse.json({ error: "Bedrock call failed. Check AWS credentials." }, { status: 500 });
     }

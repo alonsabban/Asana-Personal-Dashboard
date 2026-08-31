@@ -380,6 +380,7 @@ export type AccomplishmentTask = {
  */
 export async function generateAccomplishmentsSummary(
   tasks: AccomplishmentTask[],
+  subjects: string[],
   aws: ResolvedAws,
 ): Promise<{ summary: string; success: boolean }> {
   try {
@@ -392,21 +393,30 @@ export async function generateAccomplishmentsSummary(
       },
     });
 
+    const subjectList = subjects.length > 0 ? subjects : [...new Set(tasks.map((t) => t.subject ?? t.project))];
+
     const systemPrompt =
-      "You are an executive assistant helping a professional write a brief status report for their manager. " +
-      "Write in first person. Be concise, specific, and professional. " +
-      "Organize the summary into 2-3 focused paragraphs, grouping related work naturally by theme or project area. " +
-      "Do not list every task individually — synthesize them into meaningful accomplishments. " +
-      "For tasks that are completed, use past tense. For tasks marked as in-progress, use present tense (e.g. 'I am currently working on...').";
+      "You are an executive assistant helping a professional write a structured status report for their manager. " +
+      "Write in first person, professionally and concisely. " +
+      "You will receive a list of work areas (subjects) and a list of tasks. " +
+      "Write exactly one short paragraph per subject, in the order given. " +
+      "Each paragraph must cover three aspects in this order: " +
+      "(1) Completed / Done — what was finished (past tense), " +
+      "(2) In Progress / Started — what is actively underway (present tense), " +
+      "(3) Scheduled / Planned — what is queued up next (future tense). " +
+      "If a subject has no tasks at all for the period, write one sentence saying no activity was recorded. " +
+      "Do not skip any subject. Do not add headers or bullet points — flowing prose only. " +
+      "Synthesize tasks into accomplishments; do not just list task names verbatim.";
 
     const userContent =
-      `Here are my recent tasks. Please write a 2-3 paragraph executive summary. ` +
-      `Include completed work (past tense) and highlight work that is in progress (present tense):\n\n` +
+      `Work areas to cover (write one paragraph each, in this order):\n` +
+      subjectList.map((s, i) => `${i + 1}. ${s}`).join("\n") +
+      `\n\nTasks for the period:\n` +
       JSON.stringify(
         tasks.map((t) => ({
           task: t.name,
-          area: t.subject ?? t.project,
-          state: t.completedAt ? "completed" : "in progress",
+          subject: t.subject ?? t.project,
+          state: t.completedAt ? "completed" : t.status ?? "in progress",
           completedOn: t.completedAt ? t.completedAt.slice(0, 10) : null,
           ...(t.notes ? { description: t.notes } : {}),
           ...(t.subtasks.length > 0
