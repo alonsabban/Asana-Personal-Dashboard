@@ -26,6 +26,7 @@ export default function AccomplishmentsReport() {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
   const [includeCompleted, setIncludeCompleted] = useState(true);
   const [summary, setSummary] = useState("");
+  const [reportDays, setReportDays] = useState(14);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -119,6 +120,7 @@ export default function AccomplishmentsReport() {
         return;
       }
       setSummary(json.summary ?? "");
+      setReportDays(days);
       setStep("result");
     } catch {
       setError("Network error. Please try again.");
@@ -128,7 +130,7 @@ export default function AccomplishmentsReport() {
 
   async function copySummary() {
     try {
-      await navigator.clipboard.writeText(summary);
+      await navigator.clipboard.writeText(`Period: ${formatDateRange(reportDays)}\n\n${summary}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -154,7 +156,7 @@ export default function AccomplishmentsReport() {
         `  • ${t.name}${t.completedAt ? ` — completed ${t.completedAt.slice(0, 10)}` : t.status ? ` — ${t.status}` : ""}`
       ).join("\n")
     ).join("\n\n");
-    const full = `${summary}\n\n---\nTask list:\n${taskSection}`;
+    const full = `Period: ${formatDateRange(reportDays)}\n\n${summary}\n\n---\nTask list:\n${taskSection}`;
     try {
       await navigator.clipboard.writeText(full);
       setCopied(true);
@@ -171,6 +173,13 @@ export default function AccomplishmentsReport() {
       else next.add(s);
       return next;
     });
+  }
+
+  function formatDateRange(numDays: number): string {
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    const to = new Date();
+    const from = new Date(to.getTime() - numDays * 86_400_000);
+    return `${fmt(from)} – ${fmt(to)}`;
   }
 
   const matchCount = filteredTasks().length;
@@ -293,6 +302,9 @@ export default function AccomplishmentsReport() {
                 <>
                   <div className="settings-section">
                     <h4 className="settings-section-title">Executive Summary</h4>
+                    <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 8 }}>
+                      Period: {formatDateRange(reportDays)}
+                    </div>
                     <div
                       style={{
                         whiteSpace: "pre-wrap",
