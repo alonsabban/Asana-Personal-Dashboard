@@ -483,16 +483,20 @@ export async function generateAccomplishmentsSummary(
     const subjectList = subjects.length > 0 ? subjects : [...new Set(tasks.map((t) => t.subject ?? t.project))];
 
     const systemPrompt =
-      "You are an executive assistant helping a professional write a structured status report for their manager. " +
-      "Write in first person, professionally and concisely. " +
-      "You will receive a list of work areas (subjects) and a list of tasks. " +
-      "For each subject, output its name on its own line, then 2-5 bullet points (each starting with '• '). " +
-      "Separate subjects with a blank line. " +
-      "Each bullet should be one concise sentence covering one accomplishment or activity. " +
-      "Within each subject, order bullets: completed items first (past tense), then in-progress (present tense), then planned/scheduled (future tense). " +
-      "If a subject has no tasks, write a single bullet: '• No activity recorded this period.' " +
-      "Do not skip any subject. Do not write introductory or closing sentences. Output only the subject blocks. " +
-      "Synthesize tasks into accomplishments; do not copy task names verbatim.";
+      "You are an executive assistant writing a structured weekly status report for a professional.\n\n" +
+      "For each work area, write the area name on its own line, then 3–5 bullet points (each starting with '• '). " +
+      "Separate areas with a blank line. Do not write any intro or closing sentence — output only the area blocks.\n\n" +
+      "For each task in your input:\n" +
+      "- Read the task name AND description together to understand what the work is about.\n" +
+      "- Look at subtasks to understand what has been done vs. what remains open.\n" +
+      "- Use the task state (completed / in progress / planned) to write in the correct tense.\n" +
+      "- Synthesize: write what was ACHIEVED or PROGRESSED, not a restatement of the task name.\n" +
+      "  Bad: '• Worked on the stakeholder alignment document.'\n" +
+      "  Good: '• Drafted the stakeholder alignment doc and circulated it for review — waiting on two sign-offs.'\n\n" +
+      "Within each area, order bullets: completed items first (past tense), then in-progress (present tense), then planned (future tense). " +
+      "Write in first person. Be specific and professional. If a task has subtasks, use the done/open breakdown to describe partial progress. " +
+      "If an area has no tasks, write a single bullet: '• No activity recorded this period.' " +
+      "Do not skip any area.";
 
     const userContent =
       `Work areas to cover (write one paragraph each, in this order):\n` +
@@ -515,14 +519,14 @@ export async function generateAccomplishmentsSummary(
 
     const payload = {
       anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: "user", content: userContent }],
     };
 
     const raw = await client.send(
       new InvokeModelCommand({
-        modelId: aws.modelId,
+        modelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
         contentType: "application/json",
         accept: "application/json",
         body: JSON.stringify(payload),
