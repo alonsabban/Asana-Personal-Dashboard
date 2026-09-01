@@ -524,7 +524,7 @@ export async function generateAccomplishmentsSummary(
       messages: [{ role: "user", content: userContent }],
     };
 
-    // Prefer Sonnet for higher-quality synthesis; fall back to configured model if unavailable.
+    // Prefer Sonnet for higher-quality synthesis; fall back to configured model on any error.
     const PREFERRED_MODEL = "anthropic.claude-sonnet-4-5-20250929-v1:0";
     let raw;
     try {
@@ -536,20 +536,15 @@ export async function generateAccomplishmentsSummary(
           body: JSON.stringify(payload),
         }),
       );
-    } catch (modelErr) {
-      const errMsg = modelErr instanceof Error ? modelErr.message : String(modelErr);
-      if (/ValidationException|ResourceNotFound|AccessDenied|not.*available/i.test(errMsg)) {
-        raw = await client.send(
-          new InvokeModelCommand({
-            modelId: aws.modelId,
-            contentType: "application/json",
-            accept: "application/json",
-            body: JSON.stringify(payload),
-          }),
-        );
-      } else {
-        throw modelErr;
-      }
+    } catch {
+      raw = await client.send(
+        new InvokeModelCommand({
+          modelId: aws.modelId,
+          contentType: "application/json",
+          accept: "application/json",
+          body: JSON.stringify(payload),
+        }),
+      );
     }
 
     const body = JSON.parse(new TextDecoder().decode(raw.body)) as {
