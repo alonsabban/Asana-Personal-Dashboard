@@ -456,7 +456,7 @@ export type AccomplishmentTask = {
   project: string;
   subject: string | null;
   notes: string | null;
-  subtasks: { name: string; completed: boolean }[];
+  subtasks: { name: string; state: "completed" | "in-progress" | "not-started" }[];
   completedAt: string | null;
   status: string | null;
 };
@@ -486,15 +486,22 @@ export async function generateAccomplishmentsSummary(
       "You are an executive assistant writing a structured weekly status report for a professional.\n\n" +
       "For each work area, write the area name on its own line, then 3–5 bullet points (each starting with '• '). " +
       "Separate areas with a blank line. Do not write any intro or closing sentence — output only the area blocks.\n\n" +
-      "For each task in your input:\n" +
-      "- Read the task name AND description together to understand what the work is about.\n" +
-      "- Look at subtasks to understand what has been done vs. what remains open.\n" +
-      "- Use the task state (completed / in progress / planned) to write in the correct tense.\n" +
-      "- Synthesize: write what was ACHIEVED or PROGRESSED, not a restatement of the task name.\n" +
-      "  Bad: '• Worked on the stakeholder alignment document.'\n" +
-      "  Good: '• Drafted the stakeholder alignment doc and circulated it for review — waiting on two sign-offs.'\n\n" +
-      "Within each area, order bullets: completed items first (past tense), then in-progress (present tense), then planned (future tense). " +
-      "Write in first person. Be specific and professional. If a task has subtasks, use the done/open breakdown to describe partial progress. " +
+      "CRITICAL tense rules — follow exactly:\n" +
+      "- task state 'completed': use PAST TENSE. Describe what was finished and delivered.\n" +
+      "- task state 'in progress': use PRESENT/ONGOING TENSE. The work has STARTED but is NOT done. Never imply it is finished.\n" +
+      "  Bad: '• Completed the stakeholder alignment doc.' (wrong — it's still in progress)\n" +
+      "  Good: '• Working on the stakeholder alignment doc — draft underway.'\n" +
+      "- task state 'planned' or no state: use FUTURE or PLANNED TENSE.\n\n" +
+      "For subtasks, each has one of three states — treat them independently:\n" +
+      "- 'completed': that specific subtask is done (past tense for it)\n" +
+      "- 'in-progress': that subtask has started but is not done (ongoing tense for it)\n" +
+      "- 'not-started': that subtask has not begun yet (future/pending tense for it)\n" +
+      "Do NOT lump all subtasks together as if they share a single state. Describe the breakdown specifically.\n" +
+      "  Example: '• Vendor evaluation underway — scoring framework complete, proposal review in progress, final decision pending.'\n\n" +
+      "For each task, read the name AND description together to understand the actual work. " +
+      "Synthesize: write what was achieved or progressed, not a restatement of the task name. " +
+      "Within each area, order bullets: completed items first, then in-progress, then planned. " +
+      "Write in first person. Be specific and professional. " +
       "If an area has no tasks, write a single bullet: '• No activity recorded this period.' " +
       "Do not skip any area.";
 
@@ -510,7 +517,7 @@ export async function generateAccomplishmentsSummary(
           completedOn: t.completedAt ? t.completedAt.slice(0, 10) : null,
           ...(t.notes ? { description: t.notes } : {}),
           ...(t.subtasks.length > 0
-            ? { subtasks: t.subtasks.map((s) => `${s.completed ? "[done]" : "[open]"} ${s.name}`) }
+            ? { subtasks: t.subtasks.map((s) => `[${s.state}] ${s.name}`) }
             : {}),
         })),
         null,

@@ -17,7 +17,11 @@ type RawReportTask = {
   completed_at?: string | null;
   due_on?: string | null;
   projects?: { gid: string; name: string }[];
-  subtasks?: { name: string; completed: boolean }[];
+  subtasks?: {
+    name: string;
+    completed: boolean;
+    custom_fields?: { name: string; type: string; enum_value?: { name: string } | null }[];
+  }[];
   custom_fields?: {
     gid: string;
     name: string;
@@ -33,7 +37,7 @@ async function fetchRecentTasks(
 ): Promise<RawReportTask[]> {
   const fields =
     "name,notes,completed,completed_at,due_on,projects.gid,projects.name," +
-    "subtasks.name,subtasks.completed," +
+    "subtasks.name,subtasks.completed,subtasks.custom_fields.name,subtasks.custom_fields.type,subtasks.custom_fields.enum_value.name," +
     "custom_fields.gid,custom_fields.name,custom_fields.type,custom_fields.enum_value.name";
 
   const basePath =
@@ -129,7 +133,17 @@ export async function GET(request: Request) {
         project: primaryProject(t),
         subject,
         notes: t.notes?.trim().slice(0, 400) || null,
-        subtasks: (t.subtasks ?? []).map((s) => ({ name: s.name, completed: s.completed })),
+        subtasks: (t.subtasks ?? []).map((s) => {
+          if (s.completed) return { name: s.name, state: "completed" as const };
+          const stField = s.custom_fields?.find(
+            (f) => f.name.toLowerCase() === "status" && f.type === "enum",
+          );
+          const stVal = stField?.enum_value?.name?.toLowerCase() ?? "";
+          const state = /progress|doing|active|started/i.test(stVal)
+            ? ("in-progress" as const)
+            : ("not-started" as const);
+          return { name: s.name, state };
+        }),
         completedAt: t.completed_at ?? null,
         completed: t.completed,
         status,

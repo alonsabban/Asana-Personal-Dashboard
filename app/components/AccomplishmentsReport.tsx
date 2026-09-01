@@ -8,7 +8,7 @@ type RawTask = {
   project: string;
   subject: string | null;
   notes: string | null;
-  subtasks: { name: string; completed: boolean }[];
+  subtasks: { name: string; state: "completed" | "in-progress" | "not-started" }[];
   completedAt: string | null;
   completed: boolean;
   status: string | null;
