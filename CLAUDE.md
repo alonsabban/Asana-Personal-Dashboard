@@ -27,6 +27,8 @@ Private GitHub repo. Alon invites colleagues by GitHub username (repo → Settin
 - `Tutorial` — 7-step balloon tutorial triggered from topbar
 - `MentionTextarea` — @mention typeahead used in comments and description editors
 - `DashboardHeader` — top bar; imports `APP_VERSION` from `app/version.ts` and shows it as a version badge
+- `AccomplishmentsReport` — "Report" button in topbar; generates an AI executive summary of recently completed/in-progress tasks. User picks a time range (1 week / 2 weeks / 1 month), filters by status, and AWS Bedrock writes a structured report grouped by subject (one bullet block per subject, ordered completed → in-progress → planned). Includes a date-stamped period header and copy buttons. API: GET/POST `/api/asana/accomplishments`; summary function: `generateAccomplishmentsSummary()` in `app/lib/classify.ts`
+- `BulkAddTasks` — "+ Bulk Add" button in topbar; lets user describe multiple tasks in free text. Bedrock parses the text against the live project/section list (resolving names to GIDs), flags any fields it couldn't determine, then shows an editable review card per task — unclear fields highlighted in orange. User resolves any ambiguities and confirms before tasks are created in Asana. API: POST `/api/asana/bulk-parse`; parse function: `parseBulkTasks()` in `app/lib/classify.ts`
 
 ## Task name editing
 Single-click a task name → inline text input to rename it (saves to Asana on Enter/blur).

@@ -7,6 +7,7 @@ import Greeting from "@/app/components/Greeting";
 import Tutorial from "@/app/components/Tutorial";
 import Feedback from "@/app/components/Feedback";
 import AccomplishmentsReport from "@/app/components/AccomplishmentsReport";
+import BulkAddTasks from "@/app/components/BulkAddTasks";
 import VoiceSetupModal from "@/app/components/VoiceSetupModal";
 import { useDayPhase } from "@/app/hooks/useDayPhase";
 import { APP_VERSION } from "@/app/version";
@@ -39,6 +40,7 @@ export default function DashboardHeader() {
       </div>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
+          <BulkAddTasks />
           <AccomplishmentsReport />
           <Feedback />
           <Tutorial />

@@ -364,6 +364,90 @@ export async function classifyTasks(
   return result;
 }
 
+export type BulkParseProject = {
+  gid: string;
+  name: string;
+  sections: { gid: string; name: string }[];
+};
+
+export type BulkParsedTask = {
+  name: string;
+  projectGid: string | null;
+  projectName: string | null;
+  sectionGid: string | null;
+  sectionName: string | null;
+  due: string | null;
+  notes: string | null;
+  unclear: string[];
+};
+
+/**
+ * Parse free-form text into structured Asana tasks using Bedrock.
+ * Projects (with sections) are passed so the model can resolve names to GIDs.
+ */
+export async function parseBulkTasks(
+  text: string,
+  projects: BulkParseProject[],
+  aws: ResolvedAws,
+): Promise<{ tasks: BulkParsedTask[]; success: boolean }> {
+  try {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
+    const client = new BedrockRuntimeClient({
+      region: aws.region,
+      credentials: { accessKeyId: aws.accessKeyId, secretAccessKey: aws.secretAccessKey },
+    });
+
+    const projectsJson = JSON.stringify(
+      projects.map((p) => ({
+        gid: p.gid,
+        name: p.name,
+        sections: p.sections.map((s) => ({ gid: s.gid, name: s.name })),
+      })),
+    );
+
+    const systemPrompt =
+      "You are a task parser. Extract individual tasks from the user's free text and return them as a JSON array. " +
+      "For each task, provide: name (required), projectGid (match to the project list, null if unclear), " +
+      "projectName (matched project name, null if unclear), sectionGid (match to the project's section list, null if unclear or not mentioned), " +
+      "sectionName (matched section name, null if not mentioned), due (YYYY-MM-DD, null if not mentioned), " +
+      "notes (any additional context, null if none), unclear (array of field names you could not determine — use 'project' if project is missing or ambiguous, 'section' if a section was mentioned but not matched). " +
+      "Return ONLY a valid JSON object: { \"tasks\": [...] }. No explanation, no markdown fences. " +
+      "If today's date context is needed, assume today is " + new Date().toISOString().slice(0, 10) + ". " +
+      "Resolve relative dates like 'tomorrow', 'next Friday', 'end of week' to absolute YYYY-MM-DD.";
+
+    const userContent =
+      `Available projects and sections:\n${projectsJson}\n\nUser input:\n${text}`;
+
+    const payload = {
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }],
+    };
+
+    const raw = await client.send(
+      new InvokeModelCommand({
+        modelId: aws.modelId,
+        contentType: "application/json",
+        accept: "application/json",
+        body: JSON.stringify(payload),
+      }),
+    );
+
+    const body = JSON.parse(new TextDecoder().decode(raw.body)) as {
+      content: { type: string; text: string }[];
+    };
+    const text2 = body.content.find((b) => b.type === "text")?.text ?? "{}";
+    const cleaned = text2.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/m, "").trim();
+    const parsed = JSON.parse(cleaned) as { tasks: BulkParsedTask[] };
+
+    return { tasks: parsed.tasks ?? [], success: true };
+  } catch (err) {
+    console.error("[classify] parseBulkTasks failed:", err);
+    return { tasks: [], success: false };
+  }
+}
+
 export type AccomplishmentTask = {
   name: string;
   project: string;
