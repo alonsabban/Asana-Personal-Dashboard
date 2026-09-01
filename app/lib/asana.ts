@@ -897,12 +897,25 @@ export async function getSections(
   return raw;
 }
 
-/** Create a new task assigned to the current user in their first workspace. */
+export async function getWorkspaceMembers(): Promise<{ gid: string; name: string }[]> {
+  const token = await getToken();
+  const me = await asanaGet<{ workspaces: { gid: string }[] }>("/users/me", token);
+  const workspaceGid = me.workspaces[0]?.gid;
+  if (!workspaceGid) return [];
+  const members = await asanaGet<{ gid: string; name: string }[]>(
+    `/workspaces/${workspaceGid}/users?opt_fields=gid,name`,
+    token,
+  );
+  return members ?? [];
+}
+
+/** Create a new task. Assigns to the caller unless assigneeGid is provided. */
 export async function createTask(input: {
   name: string;
   due?: string | null;
   projectGid?: string | null;
   sectionGid?: string | null;
+  assigneeGid?: string | null;
 }): Promise<void> {
   const token = await getToken();
   const me = await asanaGet<{ workspaces: { gid: string }[] }>(
@@ -931,7 +944,7 @@ export async function createTask(input: {
     body: JSON.stringify({
       data: {
         name: input.name,
-        assignee: "me",
+        assignee: input.assigneeGid ?? "me",
         workspace: workspaceGid,
         ...(input.due ? { due_on: input.due } : {}),
         ...(memberships ? { memberships } : {}),

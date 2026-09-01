@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProjects, getSections } from "@/app/lib/asana";
+import { getProjects, getSections, getWorkspaceMembers } from "@/app/lib/asana";
 import { getAwsConfig, parseBulkTasks } from "@/app/lib/classify";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "no_aws" }, { status: 428 });
     }
 
-    // Fetch all projects in parallel, then fetch sections for each
-    const projects = await getProjects();
+    // Fetch projects and workspace members in parallel, then sections per project
+    const [projects, members] = await Promise.all([
+      getProjects(),
+      getWorkspaceMembers().catch(() => [] as { gid: string; name: string }[]),
+    ]);
     const sectionsPerProject = await Promise.all(
       projects.map((p) =>
         getSections(p.gid).catch(() => [] as { gid: string; name: string }[]),
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ tasks, projects: projectsWithSections });
+    return NextResponse.json({ tasks, projects: projectsWithSections, members });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

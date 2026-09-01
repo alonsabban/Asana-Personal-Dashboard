@@ -378,6 +378,7 @@ export type BulkParsedTask = {
   sectionName: string | null;
   due: string | null;
   notes: string | null;
+  assigneeName: string | null;
   unclear: string[];
 };
 
@@ -410,7 +411,9 @@ export async function parseBulkTasks(
       "For each task, provide: name (required), projectGid (match to the project list, null if unclear), " +
       "projectName (matched project name, null if unclear), sectionGid (match to the project's section list, null if unclear or not mentioned), " +
       "sectionName (matched section name, null if not mentioned), due (YYYY-MM-DD, null if not mentioned), " +
-      "notes (any additional context, null if none), unclear (array of field names you could not determine — use 'project' if project is missing or ambiguous, 'section' if a section was mentioned but not matched). " +
+      "notes (any additional context or description — preserve the original text exactly, including bullet points and newlines, null if none), " +
+      "assigneeName (the name of the person this task should be assigned to, extracted verbatim from the user's text, null if not mentioned), " +
+      "unclear (array of field names you could not determine — use 'project' if project is missing or ambiguous, 'section' if a section was mentioned but not matched). " +
       "Return ONLY a valid JSON object: { \"tasks\": [...] }. No explanation, no markdown fences. " +
       "If today's date context is needed, assume today is " + new Date().toISOString().slice(0, 10) + ". " +
       "Resolve relative dates like 'tomorrow', 'next Friday', 'end of week' to absolute YYYY-MM-DD.";

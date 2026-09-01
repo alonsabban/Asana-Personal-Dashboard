@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 
 type Project = { gid: string; name: string; sections: Section[] };
 type Section = { gid: string; name: string };
+type Member = { gid: string; name: string };
 
 type EditableTask = {
   id: string;
@@ -12,6 +13,7 @@ type EditableTask = {
   sectionGid: string | null;
   due: string | null;
   notes: string | null;
+  assigneeGid: string | null;
   unclear: string[];
 };
 
@@ -24,12 +26,24 @@ function nextId() {
   return String(++idCounter);
 }
 
+function matchMember(name: string | null, members: Member[]): string | null {
+  if (!name || !members.length) return null;
+  const lower = name.toLowerCase();
+  const exact = members.find((m) => m.name.toLowerCase() === lower);
+  if (exact) return exact.gid;
+  const partial = members.find(
+    (m) => m.name.toLowerCase().includes(lower) || lower.includes(m.name.toLowerCase()),
+  );
+  return partial?.gid ?? null;
+}
+
 export default function BulkAddTasks() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("input");
   const [inputText, setInputText] = useState("");
   const [tasks, setTasks] = useState<EditableTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState("");
   const [results, setResults] = useState<CreateResult[]>([]);
 
@@ -38,6 +52,7 @@ export default function BulkAddTasks() {
     setInputText("");
     setTasks([]);
     setProjects([]);
+    setMembers([]);
     setError("");
     setResults([]);
   }
@@ -66,9 +81,11 @@ export default function BulkAddTasks() {
           sectionName: string | null;
           due: string | null;
           notes: string | null;
+          assigneeName: string | null;
           unclear: string[];
         }[];
         projects?: Project[];
+        members?: Member[];
         error?: string;
       };
       if (!res.ok || json.error) {
@@ -80,7 +97,9 @@ export default function BulkAddTasks() {
         setStep("input");
         return;
       }
+      const fetchedMembers = json.members ?? [];
       setProjects(json.projects ?? []);
+      setMembers(fetchedMembers);
       setTasks(
         (json.tasks ?? []).map((t) => ({
           id: nextId(),
@@ -89,6 +108,7 @@ export default function BulkAddTasks() {
           sectionGid: t.sectionGid,
           due: t.due,
           notes: t.notes,
+          assigneeGid: matchMember(t.assigneeName, fetchedMembers),
           unclear: t.unclear ?? [],
         })),
       );
@@ -140,6 +160,7 @@ export default function BulkAddTasks() {
             due: t.due ?? null,
             projectGid: t.projectGid ?? null,
             sectionGid: t.sectionGid ?? null,
+            assigneeGid: t.assigneeGid ?? null,
           }),
         });
         if (!res.ok) {
@@ -267,7 +288,7 @@ export default function BulkAddTasks() {
                           </button>
                         </div>
 
-                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8, alignItems: "start" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 8, alignItems: "start" }}>
                           {/* Name */}
                           <div>
                             <label style={{ fontSize: 11, color: "var(--text-faint)", display: "block", marginBottom: 3 }}>Task name *</label>
@@ -326,16 +347,32 @@ export default function BulkAddTasks() {
                               onChange={(e) => updateTask(task.id, { due: e.target.value || null })}
                             />
                           </div>
+
+                          {/* Assignee */}
+                          <div>
+                            <label style={{ fontSize: 11, color: "var(--text-faint)", display: "block", marginBottom: 3 }}>Assignee</label>
+                            <select
+                              style={fieldStyle(false)}
+                              value={task.assigneeGid ?? "me"}
+                              onChange={(e) => updateTask(task.id, { assigneeGid: e.target.value === "me" ? null : e.target.value })}
+                            >
+                              <option value="me">Me</option>
+                              {members.map((m) => (
+                                <option key={m.gid} value={m.gid}>{m.name}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
                         {/* Notes */}
-                        {task.notes && (
+                        {task.notes !== null && (
                           <div style={{ marginTop: 8 }}>
                             <label style={{ fontSize: 11, color: "var(--text-faint)", display: "block", marginBottom: 3 }}>Notes</label>
-                            <input
-                              style={fieldStyle(false)}
-                              value={task.notes}
+                            <textarea
+                              style={{ ...fieldStyle(false), resize: "vertical", minHeight: 56 }}
+                              value={task.notes ?? ""}
                               onChange={(e) => updateTask(task.id, { notes: e.target.value || null })}
+                              rows={3}
                             />
                           </div>
                         )}

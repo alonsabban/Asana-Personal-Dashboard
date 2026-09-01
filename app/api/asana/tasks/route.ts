@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       due?: string | null;
       projectGid?: string | null;
       sectionGid?: string | null;
+      assigneeGid?: string | null;
     };
     if (!body.name?.trim()) {
       return NextResponse.json({ error: "Task name is required." }, { status: 400 });
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       due: body.due ?? null,
       projectGid: body.projectGid ?? null,
       sectionGid: body.sectionGid ?? null,
+      assigneeGid: body.assigneeGid ?? null,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
