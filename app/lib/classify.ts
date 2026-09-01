@@ -524,14 +524,33 @@ export async function generateAccomplishmentsSummary(
       messages: [{ role: "user", content: userContent }],
     };
 
-    const raw = await client.send(
-      new InvokeModelCommand({
-        modelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
-        contentType: "application/json",
-        accept: "application/json",
-        body: JSON.stringify(payload),
-      }),
-    );
+    // Prefer Sonnet for higher-quality synthesis; fall back to configured model if unavailable.
+    const PREFERRED_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0";
+    let raw;
+    try {
+      raw = await client.send(
+        new InvokeModelCommand({
+          modelId: PREFERRED_MODEL,
+          contentType: "application/json",
+          accept: "application/json",
+          body: JSON.stringify(payload),
+        }),
+      );
+    } catch (modelErr) {
+      const errMsg = modelErr instanceof Error ? modelErr.message : String(modelErr);
+      if (/ValidationException|ResourceNotFound|AccessDenied|not.*available/i.test(errMsg)) {
+        raw = await client.send(
+          new InvokeModelCommand({
+            modelId: aws.modelId,
+            contentType: "application/json",
+            accept: "application/json",
+            body: JSON.stringify(payload),
+          }),
+        );
+      } else {
+        throw modelErr;
+      }
+    }
 
     const body = JSON.parse(new TextDecoder().decode(raw.body)) as {
       content: { type: string; text: string }[];
