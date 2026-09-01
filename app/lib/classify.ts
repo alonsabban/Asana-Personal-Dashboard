@@ -525,7 +525,7 @@ export async function generateAccomplishmentsSummary(
     };
 
     // Prefer Sonnet for higher-quality synthesis; fall back to configured model if unavailable.
-    const PREFERRED_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0";
+    const PREFERRED_MODEL = "anthropic.claude-sonnet-4-5-20250929-v1:0";
     let raw;
     try {
       raw = await client.send(
