@@ -897,13 +897,10 @@ export async function getSections(
   return raw;
 }
 
-export async function getWorkspaceMembers(): Promise<{ gid: string; name: string }[]> {
+export async function getProjectMembers(projectGid: string): Promise<{ gid: string; name: string }[]> {
   const token = await getToken();
-  const me = await asanaGet<{ workspaces: { gid: string }[] }>("/users/me", token);
-  const workspaceGid = me.workspaces[0]?.gid;
-  if (!workspaceGid) return [];
   const members = await asanaGet<{ gid: string; name: string }[]>(
-    `/workspaces/${workspaceGid}/users?opt_fields=gid,name`,
+    `/projects/${projectGid}/members?opt_fields=gid,name`,
     token,
   );
   return members ?? [];

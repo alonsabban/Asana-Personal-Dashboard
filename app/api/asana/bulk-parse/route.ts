@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProjects, getSections, getWorkspaceMembers } from "@/app/lib/asana";
+import { getProjects, getSections, getProjectMembers } from "@/app/lib/asana";
 import { getAwsConfig, parseBulkTasks } from "@/app/lib/classify";
 
 export const dynamic = "force-dynamic";
@@ -19,16 +19,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "no_aws" }, { status: 428 });
     }
 
-    // Fetch projects and workspace members in parallel, then sections per project
-    const [projects, members] = await Promise.all([
-      getProjects(),
-      getWorkspaceMembers().catch(() => [] as { gid: string; name: string }[]),
+    // Fetch projects first, then sections + members per project in parallel
+    const projects = await getProjects();
+    const [sectionsPerProject, membersPerProject] = await Promise.all([
+      Promise.all(projects.map((p) => getSections(p.gid).catch(() => [] as { gid: string; name: string }[]))),
+      Promise.all(projects.map((p) => getProjectMembers(p.gid).catch(() => [] as { gid: string; name: string }[]))),
     ]);
-    const sectionsPerProject = await Promise.all(
-      projects.map((p) =>
-        getSections(p.gid).catch(() => [] as { gid: string; name: string }[]),
-      ),
-    );
+
+    // Deduplicate members across all projects by GID
+    const memberMap = new Map<string, { gid: string; name: string }>();
+    for (const list of membersPerProject) {
+      for (const m of list) memberMap.set(m.gid, m);
+    }
+    const members = Array.from(memberMap.values());
 
     const projectsWithSections = projects.map((p, i) => ({
       ...p,
